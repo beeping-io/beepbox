@@ -12,7 +12,7 @@
 [Qué es Beeping](#qué-es-beeping) |
 [Repositorios](#repositorios) |
 [Documentación](#documentación) |
-[Qué es Beeping](#qué-es-beepbox) |
+[Qué es BeepBox](#qué-es-beepbox) |
 [Licencia](#licencia) |
 [Frase](#frase)
 
