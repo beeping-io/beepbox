@@ -13,6 +13,7 @@
 [Repositorios](#repositorios) |
 [Documentación](#documentación) |
 [Qué es BeepBox](#qué-es-beepbox) |
+[Releases](#releases) |
 [Licencia](#licencia) |
 [Frase](#frase)
 
@@ -35,6 +36,10 @@ Desde este link - [Documentación oficial](https://beeping-io.github.io/beeping/
 **Beepbox** es un binario de **Beeping** que se usa para generar ultrasonidos.
 
 Para ver los pasos para su instalación y uso entra en nuestra [Documentación oficial](https://beeping-io.github.io/beeping/es).
+
+## Releases
+
+Podéis acceder a las distintas releases de **BeepBox** desde el [siguiente link](https://github.com/beeping-io/beepbox/releases).
 
 ## Licencia
 
