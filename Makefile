@@ -16,7 +16,7 @@ BeepBox: $(OBJS)
 	g++ $(OBJS) -L. -L./lib -lBeepingCore -lm /usr/local/lib/libsndfile.a /usr/local/lib/libFLAC.a /usr/local/lib/libogg.a /usr/local/lib/libvorbis.a /usr/local/lib/libvorbisenc.a -o ./bin/$@
 
 clean:
-	rm -f $(OBJS) $(DEPS) ./bin/BeepBox
+	rm -f $(OBJS) $(DEPS) ./bin/BeepBox ./bin/BeepBox-MacOs.zip
 
 CXXFLAGS= -w -DLINUX -DOSX -I. -I/usr/local/include -I./lib \
           -I./lib/include  -I./src/ebur128  \
