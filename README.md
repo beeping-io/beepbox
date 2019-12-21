@@ -4,7 +4,7 @@
 
 > This page can be read in the following languages:
 
-[English](README.md) | [Español](README.es.md) | [Chinese](README.zh-CN.md)
+[English](README.md) | [Spanish](README.es.md) | [Chinese](README.zh-CN.md)
 
 ## Table of Contents
 
