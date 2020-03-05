@@ -4,7 +4,7 @@
 
 > La documentación de **BeepBox** se puede leer en los siguiente idiomas:
 
-[Español](README.es.md)
+[Inglés](README.md) | [Español](README.es.md)
 
 ## Tabla de contenidos
 
