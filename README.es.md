@@ -1,6 +1,6 @@
 ![Beeping Logo](https://beeping.io/assets/images/beeping/brand/brand48.png)
 
-# Documentación de BeepBox
+# Documentación del iPhone SDK
 
 > La documentación de **BeepBox** se puede leer en los siguiente idiomas:
 
