@@ -29,13 +29,13 @@ You can access all these components from our [main repository](https://github.co
 
 ## Documentation
 
-From this link - [Official Documentation](https://beeping-io.github.io/beeping) - you can access all the official **Beeping** documentation.
+From this link - [Official Documentation](https://en.beeping.land) - you can access all the official **Beeping** documentation.
 
 ## What BeepBox is
 
 **Beepbox** is a **Beeping** binary that is used to generate ultrasound.
 
-To read the steps for installing and using this binary, click on the link to our [official Documentation](https://beeping-io.github.io/beeping/).
+To read the steps for installing and using this binary, click on the link to our [official Documentation](https://en.beeping.land).
 
 ## Releases
 
