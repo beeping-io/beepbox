@@ -2,7 +2,7 @@
 
 # Documentación del iPhone SDK
 
-> La documentación de **BeepBox** se puede leer en los siguiente idiomas:
+> La documentación de **iPhone SDK** se puede leer en los siguiente idiomas:
 
 [Inglés](README.md) | [Español](README.es.md)
 
