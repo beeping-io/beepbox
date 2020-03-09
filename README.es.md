@@ -29,17 +29,17 @@ Puedes acceder a todos los estos componentes desde nuestro [repositorio principa
 
 ## Documentación
 
-Desde este link - [Documentación oficial](https://es.beeping.land) - puedes acceder a toda la documentación oficial de **Beeping**.
+Desde este link - [Documentación oficial](https://docs-es.beeping.io) - puedes acceder a toda la documentación oficial de **Beeping**.
 
-## Qué es SDK de iPhone
+## Qué es Beepbox
 
 **SDK de iPhone** es el framework de **Beeping** para iPhone para desencriptar los datos embebidos en un **Beep*.
 
-Para ver los pasos para su instalación y uso entra en nuestra [Documentación oficial](https://es.beeping.land).
+Para ver los pasos para su instalación y uso entra en nuestra [Documentación oficial](https://docs-es.beeping.io).
 
 ## Releases
 
-Podéis acceder a las distintas releases de **SDK de iPhone** desde el [siguiente link](https://github.com/beeping-io/sdk-iphone-objective-c/releases).
+Podéis acceder a las distintas releases de **Beepbox** desde el [siguiente link](https://github.com/beeping-io/beepbox/releases).
 
 ## Licencia
 
