@@ -1,8 +1,8 @@
 ![Beeping Logo](https://beeping.io/assets/images/beeping/brand/brand48.png)
 
-# Documentación del iPhone SDK
+# Documentación de BeepBox
 
-> La documentación de **iPhone SDK** se puede leer en los siguiente idiomas:
+> La documentación de **Beepbox** se puede leer en los siguiente idiomas:
 
 [Inglés](README.md) | [Español](README.es.md)
 
@@ -33,7 +33,7 @@ Desde este link - [Documentación oficial](https://docs-es.beeping.io) - puedes 
 
 ## Qué es Beepbox
 
-**SDK de iPhone** es el framework de **Beeping** para iPhone para desencriptar los datos embebidos en un **Beep*.
+**Beepbox** es el binario de **Beeping** binary que se utiliza para generar ultrasonidos.
 
 Para ver los pasos para su instalación y uso entra en nuestra [Documentación oficial](https://docs-es.beeping.io).
 
@@ -43,7 +43,7 @@ Podéis acceder a las distintas releases de **Beepbox** desde el [siguiente link
 
 ## Licencia
 
-**SDK de iPhone** es una release **Apache License**, versión 2.0, que es una licencia **open source**.
+**Beepbox** es una release **Apache License**, versión 2.0, que es una licencia **open source**.
 
 **Beeping** ha escogido usar esta licencia para garantizar tu libertad de compartir y utilizar la tecnología sin ningún tipo de cargo económico, y para estar seguros de que esta tecnología es libre para todos los usuarios.
 
