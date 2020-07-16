@@ -1,6 +1,6 @@
 /*--------------------------------------------------------------------------------
  BeepBox
- version 1.0.0
+ Version 1.1.0
  Apache License 2.0
  --------------------------------------------------------------------------------*/
 
@@ -38,7 +38,7 @@ void showVersion(int silentMode)
     std::cerr << "************************************************************" << std::endl;
     std::cerr << "*  BeepBox App                                             *" << std::endl;
     std::cerr << "*  Apache License 2.0                                      *" << std::endl;    
-    std::cerr << "*   -- BeepBox v1.0.0 [20191213] --                        *" << std::endl;    
+    std::cerr << "*   -- BeepBox v1.1.0 [20200716] --                        *" << std::endl;    
     std::cerr << "************************************************************" << std::endl << std::endl;
   }
 }
@@ -150,9 +150,6 @@ int fromBaseToDec(char * number, int length, int rad)
   return decimal;
 }
 
-
-
-
 int main(int argc, char** argv)
 {
   void* mBeepingCore;
@@ -162,8 +159,8 @@ int main(int argc, char** argv)
   cliParser.addOption("m", "mode", CliParser::CLI_INT, true, "value", "Beeping Mode (0:audible, 1:hidden, 2:non-audible, 3:custom)", "2");
   cliParser.addOption("f", "file", CliParser::CLI_STRING, true, "filename", "Input filename (.wav) to mix with beeps", "");
   cliParser.addOption("k", "key", CliParser::CLI_STRING, false, "key", "Key identifier (5 characters) to encode in output audio (e.g. 01234)", "");
-  cliParser.addOption("d", "duration", CliParser::CLI_FLOAT, true, "value", "Duration of output file in seconds (e.g. 123.5)", "5.1");
-  cliParser.addOption("i", "interval", CliParser::CLI_FLOAT, true, "value", "Interval in seconds (>=2.5) between two audio marks (e.g. 10)", "10.0");
+  cliParser.addOption("d", "duration", CliParser::CLI_FLOAT, true, "value", "Duration of output file in seconds (>=5.1)", "5.1");
+  cliParser.addOption("i", "interval", CliParser::CLI_FLOAT, true, "value", "Interval in seconds (>=2.5) between two audio marks (e.g. 10)", "2.5");
   cliParser.addOption("s", "start", CliParser::CLI_FLOAT, true, "value", "Start time of the first audio mark in seconds (>2.2) (e.g. 2.5)", "5");
   cliParser.addOption("o", "output", CliParser::CLI_STRING, false, "filename", "Filename of output audio file that will be written (.wav)", "");
 
