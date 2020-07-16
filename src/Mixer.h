@@ -1,13 +1,8 @@
 /*--------------------------------------------------------------------------------
  Mixer.h
- 
- Copyright (C) 2016 Beeping LLC., All rights reserved
- 
- CONFIDENTIAL: This document contains confidential information.
- Do not disclose any information contained in this document to any
- third-party without the prior written consent of Beeping LLC.
+ Version 1.1.0
+ Apache Lisence 2.0
  --------------------------------------------------------------------------------*/
-
 
 #ifndef Mixer_h
 #define Mixer_h
