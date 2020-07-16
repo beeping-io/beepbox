@@ -617,6 +617,8 @@ inline std::string CliParser::generateUsageMessage(FlagType flagType, bool hideA
 
 	std::stringstream msg;
 
+	std::string params[3] = {"--mode", "--duration", "--interval"};
+
 	// Command:
 	//msg << std::endl;
 
@@ -629,18 +631,35 @@ inline std::string CliParser::generateUsageMessage(FlagType flagType, bool hideA
 		executableOnlyNoExtension = executableName_.substr(beginFilename, endFilename - beginFilename);
 	}
 
-	std::string usageLine = "Usage: BeepBox" + executableOnlyNoExtension;
+	std::string usageLine = "Usage: BeepBox " + executableOnlyNoExtension;
 	//if (options_.size() > 0)
 		//usageLine += " ";
 	std::string argumentsLine = "";
+
 	for (int i = 0; i < options_.size(); ++i)
 	{
 
-		if (options_[i].isOptional)
-			continue;
+		if (options_[i].isOptional) {
 
-			if (i > 0)
-				argumentsLine += " ";
+			int found = 0 ;
+
+			for (int y = 0; y < 4; y++)
+			{
+				if (options_[i].getName(flagType, true) == params[y])
+				{
+					found = 1 ;
+
+					break ;					
+				}
+			}
+
+			if (found == 0 )
+				continue;
+
+		}
+
+		if (i > 0)
+			argumentsLine += " ";
 		if (options_[i].isOptional)
 			argumentsLine += "[";
 		argumentsLine += options_[i].getName(flagType, true);
@@ -667,7 +686,23 @@ inline std::string CliParser::generateUsageMessage(FlagType flagType, bool hideA
 		{
 
 			if (options_[i].isOptional)
-				continue;
+			{
+
+				int found = 0;
+
+				for (int y = 0; y < 4; y++)
+				{
+					if (options_[i].getName(flagType, true) == params[y])
+					{
+						found = 1;
+
+						break;
+					}
+				}
+
+				if (found == 0)
+					continue;
+			}
 
 				std::string optLine = "";
 			optLine += spacer("", tabSize);
