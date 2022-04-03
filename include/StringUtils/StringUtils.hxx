@@ -9,7 +9,7 @@
 #include <iterator>
 #include <stdexcept>
 #include <cstdarg>
-#include <cctype> // tolower
+#include <cctype>
 #include <cstring>
 #include <cstdio>
 
@@ -29,13 +29,13 @@ std::string replace(const std::string &s, const std::string &a, const std::strin
 inline std::string lowerLatin1(const std::string &s)
 {
 	std::string s2 = lower(s);
-	s2 = replace(s2, "\xc1", "\xe1"); // "Á" -> "á"
-	s2 = replace(s2, "\xc9", "\xe9"); // "É" -> "é"
-	s2 = replace(s2, "\xcd", "\xed"); // "Í" -> "í"
-	s2 = replace(s2, "\xd3", "\xf3"); // "Ó" -> "ó"
-	s2 = replace(s2, "\xda", "\xfa"); // "Ú" -> "ú"
-	s2 = replace(s2, "\xdc", "\xfc"); // "Ü" -> "ü"
-	s2 = replace(s2, "\xd1", "\xf1"); // "Ñ" -> "ñ"
+	s2 = replace(s2, "\xc1", "\xe1"); // "ï¿½" -> "ï¿½"
+	s2 = replace(s2, "\xc9", "\xe9"); // "ï¿½" -> "ï¿½"
+	s2 = replace(s2, "\xcd", "\xed"); // "ï¿½" -> "ï¿½"
+	s2 = replace(s2, "\xd3", "\xf3"); // "ï¿½" -> "ï¿½"
+	s2 = replace(s2, "\xda", "\xfa"); // "ï¿½" -> "ï¿½"
+	s2 = replace(s2, "\xdc", "\xfc"); // "ï¿½" -> "ï¿½"
+	s2 = replace(s2, "\xd1", "\xf1"); // "ï¿½" -> "ï¿½"
 	return s2;
 }
 

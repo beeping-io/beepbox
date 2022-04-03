@@ -1,50 +1,52 @@
-# See http://help.github.com/ignore-files/ for more about ignoring files.
+# Prerequisites
+*.d
 
-# compiled output
-/dist
-/tmp
-/out-tsc
-/app-builds
-/release
-main.js
-src/**/*.js
-!src/karma.conf.js
-*.js.map
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
 
-# dependencies
-/node_modules
+# Precompiled Headers
+*.gch
+*.pch
 
-# IDEs and editors
-/.idea
-.project
-.classpath
-.c9/
-*.launch
-.settings/
-*.sublime-workspace
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
 
-# IDE - VSCode
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
+# Fortran module files
+*.mod
+*.smod
 
-# misc
-/.sass-cache
-/connect.lock
-/coverage
-/libpeerconnection.log
-npm-debug.log
-testem.log
-/typings
-package-lock.json
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
 
-# e2e
-/e2e/*.js
-!/e2e/protractor.conf.js
-/e2e/*.map
+# Executables
+*.exe
+*.out
+*.app
 
-# System Files
-.DS_Store
-Thumbs.db
+# CMake
+CMakeLists.txt.user
+CMakeCache.txt
+cmake_install.cmake
+CPackConfig.cmake
+CPackSourceConfig.cmake
+install_manifest.txt
+CMakeFiles
+CMakeScripts
+MakeFile
+Testing
+lib
+
+# VSCode
+.vscode/
+
+# Local History for Visual Studio Code
+.history/
+
