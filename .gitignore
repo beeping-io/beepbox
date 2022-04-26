@@ -31,22 +31,18 @@
 *.out
 *.app
 
-# CMake
-CMakeLists.txt.user
-CMakeCache.txt
-cmake_install.cmake
-CPackConfig.cmake
-CPackSourceConfig.cmake
-install_manifest.txt
-CMakeFiles
-CMakeScripts
-MakeFile
-Testing
-lib
-
 # VSCode
-.vscode/
+.vscode
 
 # Local History for Visual Studio Code
 .history/
 
+# Local builds
+CMakeFiles
+CMakeCache.txt
+
+# Library
+lib
+bin
+build
+include/configure.h

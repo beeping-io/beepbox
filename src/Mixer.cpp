@@ -4,7 +4,7 @@
  Apache Lisence 2.0
  --------------------------------------------------------------------------------*/
 
-#include "Mixer.h"
+#include <Mixer.h>
 
 #include <strstream>
 #include <iostream>
@@ -67,7 +67,7 @@ int Mixer::mix(const float** bufferPgm, const int nsamples, int nchannels, const
       
       float minlevelLin = pow(10.f, mMinBeepLevel/20.f);
       float globalLevelDB = percentile10 + mDefaultBeepLevel;
-      float globalBeepLevel = std::max(minlevelLin, std::min(.95f, powf(10.f, globalLevelDB /20.f))); // TODO
+      float globalBeepLevel = std::max(minlevelLin, std::min(.95f, powf(10.f, globalLevelDB /20.f)));
       
       // apply default gain for all channels
       for (int i=0; i < nsamples; i++)

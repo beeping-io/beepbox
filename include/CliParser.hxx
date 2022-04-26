@@ -12,7 +12,7 @@
 #undef max
 #include <algorithm>
 
-#include "StringUtils.hxx"
+#include <StringUtils.hxx>
 
 // o arguments are (unnamed) values
 //   - for the parser to be able to know which value is what in a list of arguments, 

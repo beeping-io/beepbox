@@ -4,10 +4,10 @@
  Apache Lisence 2.0
  --------------------------------------------------------------------------------*/
 
-#include "LoudnessStats.h"
+#include <LoudnessStats.h>
 
-#include "sndfile.h"
-#include "ebur128.h"
+#include <sndfile.h>
+#include <ebur128.h>
 
 #include <stdlib.h>
 #include <string.h>

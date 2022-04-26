@@ -1,2 +1,0 @@
-#define BEEPBOX_CORE_MAJOR 
-#define BEEPBOX_CORE_MINOR 

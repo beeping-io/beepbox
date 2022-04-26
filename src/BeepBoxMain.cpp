@@ -4,11 +4,11 @@
  Apache License 2.0
  --------------------------------------------------------------------------------*/
 
-#include "BeepingCoreLib_api.h"
+#include <BeepingCoreLib_api.h>
 
-#include "Globals.h"
+#include <Globals.h>
 
-#include "sndfile.h"
+#include <sndfile.h>
 
 #include <stdlib.h>
 #include <iostream>
@@ -16,10 +16,10 @@
 #include <cassert>
 #include <math.h>
 
-#include "Base/CliParser.hxx"
-#include "Mixer.h"
+#include <CliParser.hxx>
+#include <Mixer.h>
 
-#include "LoudnessStats.h"
+#include <LoudnessStats.h>
 
 
 #ifndef MIN
