@@ -150,6 +150,14 @@ int fromBaseToDec(char * number, int length, int rad)
   return decimal;
 }
 
+bool replaceData(std::string& str, const std::string& from, const std::string& to) {
+    size_t start_pos = str.find(from);
+    if(start_pos == std::string::npos)
+        return false;
+    str.replace(start_pos, from.length(), to);
+    return true;
+}
+
 int main(int argc, char** argv)
 {
   void* mBeepingCore;
@@ -198,8 +206,7 @@ int main(int argc, char** argv)
   clock_t total_start,total_end;
   total_start = clock();
 
-  //const int param_mode = cliParser.getOptionAsInt("m", 2);
-  const int param_mode = 2;
+  const int param_mode = cliParser.getOptionAsInt("m", 2);  
   std::string inputFnStr = cliParser.getOptionAsString("f", "");
   std::string keyStr = cliParser.getOptionAsString("k", "");
   const float duration = cliParser.getOptionAsFloat("d", 60.0);
@@ -222,6 +229,24 @@ int main(int argc, char** argv)
 
   const int synthMode = cliParser.getOptionAsInt("sm", 0);
   const float synthVolume = cliParser.getOptionAsFloat("sv", 0.0);
+
+  // Creating certificate data base on
+  std::string certificate = "\
+    { \
+      \"id\": \"BeepBox\", \
+      \"mode\": \"[mode]\", \
+      \"key\": \"[key]\", \
+      \"duration\": \"[duration]\", \
+      \"interval\": \"[interval]\", \
+      \"file\": \"[file]\" \
+    }";
+
+  // Replacing data to create a unic certificate data base on
+  replaceData (certificate, "[mode]", std::to_string(param_mode)) ;
+  replaceData (certificate, "[key]", keyStr) ;
+  replaceData (certificate, "[duration]", std::to_string(duration)) ;
+  replaceData (certificate, "[interval]", std::to_string(interval)) ;
+  replaceData (certificate, "[file]", outputFnStr) ;
 
   //CHECK THAT PARAMETERS ARE CORRECT
   if (keyStr.size() != 5)
@@ -298,6 +323,8 @@ int main(int argc, char** argv)
   BEEPING_SetSynthMode(synthMode, mBeepingCore);
   BEEPING_SetSynthVolume(synthVolume, mBeepingCore);
 
+  // Creating certificate
+  BEEPING_createCertificate(certificate.c_str(), mBeepingCore) ;
 
   //OUTPUT FILE
   SF_INFO sfinfoOutput;
