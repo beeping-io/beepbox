@@ -26,6 +26,10 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/__arch/FindOS.cmake")
 # Adding old compatibilities
 set(CMAKE_PROJECT_INCLUDE_BEFORE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/__deps/EnablePolicies.cmake")
 
+# Adding installation dependencies
+set(CMAKE_INSTALL_INCLUDEDIR  "${CMAKE_BINARY_DIR}/include")
+set(CMAKE_INSTALL_LIBDIR "${CMAKE_BINARY_DIR}/lib")
+
 # Adding beepingcore dependency
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/__deps/GetDependencies.cmake")
 
