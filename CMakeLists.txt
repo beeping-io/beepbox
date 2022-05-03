@@ -59,15 +59,15 @@ if ( NOT LIBSNDFILE_FOUND )
 
   # Sending Error
   message(STATUS "${BoldGreen}Please, read the message:${ColourReset}")
-  
-  # Search for the right information command
-  include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/__arch/FindError.cmake")
+  message(STATUS "${BoldGreen}LibSndFile must to be installed as a dependency${ColourReset}")
    
   # Formatting
   message("\n")
 
   message(STATUS "${BoldGreen}Please, execute the following command:${ColourReset}")    
-  message(STATUS "${BoldWhite}brew install libsndfile${ColourReset}")    
+  
+  # Search for the right information command
+  include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/__arch/FindError.cmake")
 
   # Formatting
   message("\n")
