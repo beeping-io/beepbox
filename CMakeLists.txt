@@ -1,5 +1,5 @@
 # CMake Mininum Version
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.22)
 
 # Enable clean Files
 message(STATUS "Enabling ADDITIONAL_CLEAN_FILES on directory level ...")
@@ -58,14 +58,16 @@ if ( NOT LIBSNDFILE_FOUND )
   message("\n")
 
   # Sending Error
-  message(CHECK_START "${BoldGreen}Please, read the message:${ColourReset}")
-  message(CHECK_START "${BoldGreen}LibSndFile must to be installed as a dependency${ColourReset}")
+  message(STATUS "${BoldGreen}Please, read the message:${ColourReset}")
+  
+  # Search for the right information command
+  include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/__arch/FindError.cmake")
    
   # Formatting
   message("\n")
 
-  message(CHECK_START "${BoldGreen}Please, execute the following command:${ColourReset}")    
-  message(CHECK_START "${BoldWhite}brew install libsndfile")    
+  message(STATUS "${BoldGreen}Please, execute the following command:${ColourReset}")    
+  message(STATUS "${BoldWhite}brew install libsndfile${ColourReset}")    
 
   # Formatting
   message("\n")
