@@ -1,7 +1,7 @@
 if (APPLE)
     message(STATUS "${BoldWhite}brew install libsndfile${ColourReset}")
 elseif (UNIX)
-    message(STATUS "${BoldWhite}sudo apt-get -y install libsndfile1${ColourReset}")
+    message(STATUS "${BoldWhite}sudo apt-get -y install libsndfile1-dev${ColourReset}")
 else()    
     message(STATUS "${BoldWhite}No command found${ColourReset}")
 endif ()
