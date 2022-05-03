@@ -1,5 +1,5 @@
 # CMake Mininum Version
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.18)
 
 # Enable clean Files
 message(STATUS "Enabling ADDITIONAL_CLEAN_FILES on directory level ...")
