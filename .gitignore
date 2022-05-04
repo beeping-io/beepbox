@@ -37,6 +37,7 @@
 
 # Local History for Visual Studio Code
 .history/
+__OLD
 
 # Local builds
 CMakeFiles
