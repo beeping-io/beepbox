@@ -1,79 +1,71 @@
 # BeepBox
 
-BeepBox es la herramienta CLI de Beeping para generar o incrustar señales acústicas de marcaje (beeps) en archivos WAV. Utiliza **Beeping Core** para sintetizar las huellas y puede trabajar tanto en modo audible como no audible, ya sea creando un archivo nuevo o mezclando las marcas dentro de audio existente.
+BeepBox es la herramienta de línea de comandos de Beeping para generar o incrustar señales acústicas de marcaje (beeps) en WAV. Se apoya en **Beeping Core** para sintetizar las huellas y permite trabajar en modos audibles, no audibles, ocultos o personalizados. Su objetivo es transportar datos identificadores a través de audio de forma robusta.
 
-## Dependencias
-- `libsndfile` (debe estar instalada en el sistema; se detecta vía `pkg-config`).
-- `libebur128` (se descarga y compila automáticamente con CMake).
-- `Beeping Core` (se obtiene vía `FetchContent` durante la configuración de CMake).
+## Instalación / Build
+- Dependencias: CMake, compilador C++, `libsndfile` (sistema), `libebur128` (FetchContent), Beeping Core (FetchContent).
+- Pasos:
+  ```bash
+  cmake -S . -B build
+  cmake --build build
+  cmake --install build   # opcional, instala en ./bin y ./lib del repo
+  ```
+- Binario resultante: `build/BeepBox` (o `bin/BeepBox` tras instalar).
 
-## Compilación con CMake
-1. Instala `libsndfile` con tu gestor de paquetes (ej.: `brew install libsndfile` en macOS, `apt install libsndfile1-dev` en Debian/Ubuntu).
-2. Configura el proyecto (descarga libebur128 y Beeping Core):
-   ```bash
-   cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-   ```
-3. Compila:
-   ```bash
-   cmake --build build
-   ```
-4. (Opcional) Instala los binarios en `./bin` y librerías en `./lib` dentro del repo:
-   ```bash
-   cmake --install build
-   ```
-
-## Ejecución
-El binario se llama `BeepBox` y queda en `build/BeepBox` (o en `bin/BeepBox` si usaste `cmake --install`). Ejemplo de invocación mínima:
+## Uso básico
+Comando mínimo (genera 1 beep por defecto):
 ```bash
-./build/BeepBox -k 0abcd -o salida.wav
+./build/BeepBox -k 00001 -o output.wav
 ```
+Defaults relevantes: `duration=2.3s`, `interval=2.3s`, `start=0`, modo `non-audible` (2), samplerate 44100 Hz. Si solo cabe un beep, se coloca al inicio y se ignora `interval`.
 
-## Parámetro `key`
-- Es obligatorio y siempre de **5 caracteres**.
-- Se codifica en **base32** usando el alfabeto `0-9` y `a-v`.
-- Se inserta en las marcas acústicas junto con un sello temporal para permitir la verificación posterior.
+## Parámetros del CLI
+- `-k, --key` (string, requerido): Clave base32 de 5 chars `[0-9a-v]` que se incrusta en los beeps.
+- `-o, --output` (string, requerido): Ruta del WAV de salida.
+- `-d, --duration` (float): Duración en segundos. Mínimo `2.3` y `start + 2.3 <= duration`. Default `2.3`.
+- `-i, --interval` (float): Intervalo entre beeps en segundos. Mínimo `2.3`. Default `2.3`. Si solo cabe 1 beep, se ignora con warning.
+- `-s, --start` (float): Momento del primer beep en segundos (>=0). Default `0`.
+- `-m, --mode` (int): 0 audible | 1 hidden | 2 non-audible (default) | 3 custom.
+- `--bf, --basefreq` (float): Frecuencia base en Hz para modo custom. Default `12000`. Requiere `mode=3`. Debe ser >0.
+- `--ts, --tonesseparation` (int): Separación de tonos (>=1) en modo custom. Default `1`.
+- `-f, --file` (string): WAV de entrada (44.1k/48k, PCM16) para mezclar. Obligatorio para usar `mixmode`/`volumeprogram`.
+- `-x, --mixmode` (int): 0 DefaultLevel | 1 GlobalLevel | 2 DynamicLevel. Requiere `--file`; de lo contrario, error.
+- `-v, --volumebeeps` (float): Nivel de beeps en dB. Clamping [-60, 12]. Default `-3`.
+- `-p, --volumeprogram` (float): Nivel del programa en dB. Sólo aplica con `--file`; si no, se ignora. Default `0`.
+- `-r, --samplerate` (float): 44100 o 48000 para generación sin `--file`. Si hay `--file`, se usa el SR del WAV. Default `44100`.
+- `-l, --loudnessstatistics` (int): 0 desactivado | 1 activado. Default `0`.
+- `-sm, --synthmode` (int): 0 desactivado | 1 r2d2. Clamping a [0,1]. Default `0`.
+- `-sv, --synthvolume` (float): Volumen del synth en dB relativo a beeps. Clamping [-60, 12]. Default `0`.
+- `-n, --dry-run` (flag): Valida y muestra el plan (beeps, timestamps) sin generar audio ni escribir archivos.
+- `-h, --help` (flag): Muestra ayuda y ejemplos.
 
-## Principales opciones del CLI
-- `-m, --mode` (int): modo de generación (`0` audible, `1` hidden, `2` no audible, `3` custom).
-- `-f, --file` (string): WAV de entrada para mezclar (44.1 kHz o 48 kHz, PCM 16 bits). Si se omite, se crean beeps desde cero.
-- `-o, --output` (string): WAV de salida a escribir.
-- `-d, --duration` (float): duración del WAV generado, en segundos (mínimo `start` + 0.1).
-- `-i, --interval` (float): intervalo en segundos entre marcas sucesivas (>=2.5 por defecto).
-- `-s, --start` (float): tiempo inicial de la primera marca, en segundos (>~5 por defecto).
-- `-k, --key` (string): clave base32 de 5 caracteres.
-- `-x, --mixmode` (int): estrategia de mezcla (`0` DefaultLevel, `1` GlobalLevel, `2` DynamicLevel).
-- `-v, --volumebeeps` / `-p, --volumeprogram` (float): nivel de beeps y del programa en dB.
-- `-r, --samplerate` (float): frecuencia de muestreo del WAV de salida.
-- `-l, --loudnessstatistics` (int): `1` para imprimir LUFS/True Peak del resultado.
-- `-bf, --basefreq` y `-ts, --tonesseparation` (float/int): definen el banco de tonos en modo `custom` (`-m 3`).
-- `-sm, --synthmode` y `-sv, --synthvolume` (int/float): activan y nivelan la síntesis adicional mezclada con los beeps.
+## Reglas conceptuales
+- Un beep ocupa al menos `2.3s`.
+- El primer beep empieza en `--start` (default 0). Debe cumplirse `start + 2.3 <= duration`.
+- `--interval` marca la separación entre beeps; debe ser >=2.3. Si solo cabe 1 beep, se avisa y se ignora el intervalo.
+- Para mezclar (`--mixmode`, `--volumeprogram`) es obligatorio `--file`; sin archivo se produce error al usar `--mixmode` y `--volumeprogram` se ignora.
+- `--samplerate` solo se usa al generar desde cero; con `--file` se usa el SR del WAV de entrada.
+- Valores fuera de rango se clamp/warning (volúmenes, synthmode).
+- Errores bloquean la ejecución; warnings ajustan o ignoran parámetros pero continúan.
 
 ## Ejemplos
-1) **Generar solo beeps en un WAV nuevo (no audible por defecto):**
-```bash
-./build/BeepBox \
-  -k 0abc1 \
-  -o beeps_solo.wav \
-  -d 30 -i 10 -s 6 \
-  -m 2
-```
-
-2) **Mezclar beeps dentro de un WAV existente:**
-```bash
-./build/BeepBox \
-  -k 9v9v9 \
-  -f entrada.wav \
-  -o salida_con_beeps.wav \
-  -m 2 -i 8 -s 5 \
-  -x 1 -v -6 -p 0
-```
-
-3) **Generar beeps con frecuencia base personalizada (modo custom):**
-```bash
-./build/BeepBox \
-  -k a1b2c \
-  -o beeps_custom.wav \
-  -m 3 -bf 15000 -ts 10 \
-  -d 20 -i 7 -s 6
-```
-En modo `custom` la frecuencia base (`-bf`) y la separación de tonos (`-ts`) ajustan el espectro de las marcas para adaptarlo a distintos contenidos.
+- Beep único por defecto:
+  ```bash
+  BeepBox -k 00001 -o beep.wav
+  ```
+- Múltiples beeps en audio generado:
+  ```bash
+  BeepBox -k 00001 -o long.wav -d 15 -i 3 -s 0
+  ```
+- Mezclar con WAV de entrada:
+  ```bash
+  BeepBox -k 00001 -f input.wav -o mixed.wav -m 2 -i 4 -x 1 -v -6 -p 0
+  ```
+- Modo custom (freq y separación):
+  ```bash
+  BeepBox -k 00001 -o custom.wav -m 3 -bf 15000 -ts 10 -d 10 -i 3
+  ```
+- Dry-run (plan sin generar archivo):
+  ```bash
+  BeepBox -n -k 00001 -o plan.wav -d 10 -i 2.5
+  ```
