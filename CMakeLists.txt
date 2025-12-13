@@ -1,12 +1,10 @@
 # CMake Mininum Version
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.5)
+project(BeepBox LANGUAGES C CXX)
 
 # Enable clean Files
 message(STATUS "Enabling ADDITIONAL_CLEAN_FILES on directory level ...")
 option(ENABLE_DIRECTORY_CLEAN ON)
-
-# Project Name
-project(BeepBox VERSION "1.0.0")
 
 enable_testing()
 
