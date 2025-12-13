@@ -8,6 +8,8 @@ option(ENABLE_DIRECTORY_CLEAN ON)
 # Project Name
 project(BeepBox VERSION "1.0.0")
 
+enable_testing()
+
 # Linking Core Depedendency Library as Static
 set(BUILD_SHARED_LIBS OFF)
 
@@ -107,3 +109,9 @@ install(TARGETS BeepBox
 		    LIBRARY DESTINATION ${BEEPBOX_INSTALL_DIR}/lib
 )
 
+add_test(NAME BeepBoxDuration_MinimumPass
+         COMMAND BeepBox -k 00001 -o ${CMAKE_BINARY_DIR}/duration_min_ok.wav -d 2.3)
+
+add_test(NAME BeepBoxDuration_TooShortFail
+         COMMAND BeepBox -k 00001 -o ${CMAKE_BINARY_DIR}/duration_min_fail.wav -d 2.29)
+set_tests_properties(BeepBoxDuration_TooShortFail PROPERTIES WILL_FAIL TRUE)
