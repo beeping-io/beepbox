@@ -161,15 +161,16 @@ bool replaceData(std::string& str, const std::string& from, const std::string& t
 int main(int argc, char** argv)
 {
   void* mBeepingCore;
+  const float minBeepWindow = 2.3f; // duration of one beep in seconds
 
   // Handle command line interface:
   CliParser cliParser;
   cliParser.addOption("m", "mode", CliParser::CLI_INT, true, "value", "Beeping Mode (0:audible, 1:hidden, 2:non-audible, 3:custom)", "2");
   cliParser.addOption("f", "file", CliParser::CLI_STRING, true, "filename", "Input filename (.wav) to mix with beeps", "");
   cliParser.addOption("k", "key", CliParser::CLI_STRING, false, "key", "Key identifier (5 characters) to encode in output audio (e.g. 01234)", "");
-  cliParser.addOption("d", "duration", CliParser::CLI_FLOAT, true, "value", "Duration of output file in seconds (>=5.1)", "5.1");
-  cliParser.addOption("i", "interval", CliParser::CLI_FLOAT, true, "value", "Interval in seconds (>=2.5) between two audio marks (e.g. 10)", "2.5");
-  cliParser.addOption("s", "start", CliParser::CLI_FLOAT, true, "value", "Start time of the first audio mark in seconds (>2.2) (e.g. 2.5)", "5");
+  cliParser.addOption("d", "duration", CliParser::CLI_FLOAT, true, "value", "Duration of output file in seconds (>=2.3)", "2.3");
+  cliParser.addOption("i", "interval", CliParser::CLI_FLOAT, true, "value", "Interval in seconds (>=2.3) between two audio marks (e.g. 10)", "2.3");
+  cliParser.addOption("s", "start", CliParser::CLI_FLOAT, true, "value", "Start time of the first audio mark in seconds (>=0)", "0");
   cliParser.addOption("o", "output", CliParser::CLI_STRING, false, "filename", "Filename of output audio file that will be written (.wav)", "");
 
   cliParser.addOption("x", "mixmode", CliParser::CLI_INT, true, "value", "Mixing mode (0: DefaultLevel, 1: GlobalLevel, 2: DynamicLevel)", "0");
@@ -209,9 +210,11 @@ int main(int argc, char** argv)
   const int param_mode = cliParser.getOptionAsInt("m", 2);  
   std::string inputFnStr = cliParser.getOptionAsString("f", "");
   std::string keyStr = cliParser.getOptionAsString("k", "");
-  const float duration = cliParser.getOptionAsFloat("d", 60.0);
-  const float interval = cliParser.getOptionAsFloat("i", 10.0);
-  float startTime = cliParser.getOptionAsFloat("s", 5.0);
+  const bool durationProvided = cliParser.hasOption("d");
+  const bool intervalProvided = cliParser.hasOption("i");
+  float duration = cliParser.getOptionAsFloat("d", minBeepWindow);
+  float interval = cliParser.getOptionAsFloat("i", minBeepWindow);
+  float startTime = cliParser.getOptionAsFloat("s", 0.0);
   std::string outputFnStr = cliParser.getOptionAsString("o", "");
 
   const int mixmode = cliParser.getOptionAsInt("x", 0);
@@ -266,23 +269,20 @@ int main(int argc, char** argv)
     }
   }
 
-  float min_startTime = (durToken*20.f) + 0.1f;
-  float min_interval = (durToken*20.f) + 0.2f;
-  float min_duration = startTime + 0.1f;
+  float min_interval = minBeepWindow;
+  float min_duration = MAX(startTime + minBeepWindow, minBeepWindow);
 
-  if (interval < min_interval)
+  if (intervalProvided && interval < min_interval)
   {
     std::cerr << "Interval too short. The minimum allowed interval is " << min_interval << " seconds" << std::endl;
     return -1;
   }
-  /*if (interval > duration)
-  {
-    std::cerr << "Interval too big. Interval should be < duration" << std::endl;
-    return -1;
-  }*/
+  if (!intervalProvided)
+    interval = min_interval;
+
   if (duration < min_duration)
   {
-    std::cerr << "Duration too short. The minimum allowed duration is " << min_duration << " seconds (start time + 0.1 seconds)" << std::endl;
+    std::cerr << "Duration too short. The minimum allowed duration is " << min_duration << " seconds (start time + beep length)" << std::endl;
     return -1;
   }
   if (duration > 86400.f) //24 hours of wav 44Khz 16 bits mono is 7.620.480.000 bytes
@@ -290,13 +290,22 @@ int main(int argc, char** argv)
     std::cerr << "Duration too big. The maximum allowed duration is 86400 seconds (=24 hours)" << std::endl;
     return -1;
   }
-  if ((startTime > duration) || (startTime < min_startTime)) //valid start time for first audio mark
+  if ((startTime > duration) || (startTime < 0.f)) //valid start time for first audio mark
   {
-    std::cerr << "Start time is not valid. It should be > " << min_startTime << " secs." << std::endl;
+    std::cerr << "Start time is not valid. It should be >= 0 secs." << std::endl;
     return -1;
   }
 
-  startTime = MAX(startTime, min_startTime);
+  startTime = MAX(startTime, 0.f);
+
+  auto computeBeepCount = [&](float effectiveDuration, float currentInterval) -> int
+  {
+    if (effectiveDuration < minBeepWindow || (startTime + minBeepWindow) > effectiveDuration)
+      return 0;
+    float remaining = effectiveDuration - startTime - minBeepWindow;
+    int extra = (int)floor((remaining + 1e-6f) / currentInterval);
+    return 1 + MAX(extra, 0);
+  };
 
   //enum BEEPING_MODE { BEEPING_MODE_AUDIBLEOLD = 0, BEEPING_MODE_NONAUDIBLEOLD = 1, BEEPING_MODE_AUDIBLE = 2, BEEPING_MODE_NONAUDIBLE = 3, BEEPING_MODE_HIDDEN = 4, BEEPING_MODE_ALL = 5, BEEPING_MODE_CUSTOM = 6 };
   int mode = /*BEEPING_MODE::*/BEEPING_MODE_NONAUDIBLE; //2 audible, 3 non-audible
@@ -333,6 +342,17 @@ int main(int argc, char** argv)
 
   if (inputFnStr.size() == 0) //NO INPUT AUDIO, ONLY GENERATE BEEPS
   {
+    int beepsToGenerate = computeBeepCount(duration, interval);
+    if (beepsToGenerate <= 0)
+    {
+      std::cerr << "Duration too short. The minimum allowed duration is " << min_duration << " seconds (start time + beep length)" << std::endl;
+      return -1;
+    }
+    if (intervalProvided && beepsToGenerate == 1)
+    {
+      std::cerr << "Warning: interval=" << interval << "s ignored because duration=" << duration << "s only fits one beep (" << minBeepWindow << "s)." << std::endl;
+    }
+
     //Configuration
     BEEPING_Configure(mode, sampleRate, bufferSize, mBeepingCore);
 
@@ -351,6 +371,7 @@ int main(int argc, char** argv)
 
     double currentTimeInSeconds = 0.0;
     double nextMarkTime = currentTimeInSeconds + startTime;
+    int beepsGenerated = 0;
 
     float defBeepLevel = pow(10.f, volumebeeps / 20.f);
 
@@ -379,7 +400,7 @@ int main(int argc, char** argv)
         std::cout << "Progress BEEPS = " << progress_beeps << std::endl;
       }
 
-      if (currentTimeInSeconds >= (nextMarkTime - (durToken*20.f)))
+      if ((beepsGenerated < beepsToGenerate) && (currentTimeInSeconds >= (nextMarkTime - (durToken*20.f))))
       {
         int timestampInSeconds = (int)(nextMarkTime + 0.5f);
         //char timestamp[33]; //itoa(timestampInSeconds,timestamp,32);
@@ -437,6 +458,7 @@ int main(int argc, char** argv)
 
         BEEPING_ResetEncodedAudioBuffer(mBeepingCore);
 
+        beepsGenerated++;
         nextMarkTime += interval;
       }
       else
@@ -541,10 +563,22 @@ int main(int argc, char** argv)
     float *pBeepsBuffer = new float[nFrames + (int)((durToken*20.f)*sampleRate)]; //added duration of one beep message just to avoid buffer overflow when beep starts at the end of file (not sure it is needed though)
     memset(pBeepsBuffer, 0, nFrames*sizeof(float));
 
+    float input_duration = nFrames / sampleRate;
     long counterSamples = 0;
     double currentTimeInSeconds = 0.0;
     double nextMarkTime = currentTimeInSeconds + startTime;
-    float input_duration = nFrames / sampleRate;
+    int beepsGenerated = 0;
+    int beepsToGenerate = computeBeepCount(input_duration, interval);
+    if (beepsToGenerate <= 0)
+    {
+      std::cerr << "Duration too short for input file. The minimum allowed duration is " << min_duration << " seconds (start time + beep length)" << std::endl;
+      return -1;
+    }
+    if (intervalProvided && beepsToGenerate == 1)
+    {
+      std::cerr << "Warning: interval=" << interval << "s ignored because duration=" << input_duration << "s only fits one beep (" << minBeepWindow << "s)." << std::endl;
+    }
+
     while (currentTimeInSeconds < (input_duration-(bufferSize/sampleRate))) //todo:
     {
       float current_progress_beeps = (currentTimeInSeconds / input_duration)*100.f;
@@ -554,7 +588,7 @@ int main(int argc, char** argv)
         std::cout << "Progress BEEPS = " << progress_beeps << std::endl;
       }
 
-      if (currentTimeInSeconds >= (nextMarkTime - (durToken*20.f)))
+      if ((beepsGenerated < beepsToGenerate) && (currentTimeInSeconds >= (nextMarkTime - (durToken*20.f))))
       {
         int timestampInSeconds = (int)(nextMarkTime + 0.5f);
         //char timestamp[33]; //itoa(timestampInSeconds,timestamp,32);
@@ -607,6 +641,7 @@ int main(int argc, char** argv)
 
         BEEPING_ResetEncodedAudioBuffer(mBeepingCore);
 
+        beepsGenerated++;
         nextMarkTime += interval;
       }
       else
