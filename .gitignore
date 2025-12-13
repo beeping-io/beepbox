@@ -48,3 +48,6 @@ lib
 bin
 build
 include/configure.h
+
+# Beeps
+beeps
