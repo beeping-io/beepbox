@@ -160,39 +160,70 @@ bool replaceData(std::string& str, const std::string& from, const std::string& t
 
 int main(int argc, char** argv)
 {
-  void* mBeepingCore;
+  void* mBeepingCore = NULL;
   const float minBeepWindow = 2.3f; // duration of one beep in seconds
+  std::vector<std::string> rawArgs(argv + 1, argv + argc);
 
   // Handle command line interface:
   CliParser cliParser;
+  cliParser.addOption("h", "help", CliParser::CLI_NONE, true, "", "Show help message and examples", "");
   cliParser.addOption("m", "mode", CliParser::CLI_INT, true, "value", "Beeping Mode (0:audible, 1:hidden, 2:non-audible, 3:custom)", "2");
-  cliParser.addOption("f", "file", CliParser::CLI_STRING, true, "filename", "Input filename (.wav) to mix with beeps", "");
-  cliParser.addOption("k", "key", CliParser::CLI_STRING, false, "key", "Key identifier (5 characters) to encode in output audio (e.g. 01234)", "");
-  cliParser.addOption("d", "duration", CliParser::CLI_FLOAT, true, "value", "Duration of output file in seconds (>=2.3)", "2.3");
-  cliParser.addOption("i", "interval", CliParser::CLI_FLOAT, true, "value", "Interval in seconds (>=2.3) between two audio marks (e.g. 10)", "2.3");
+  cliParser.addOption("f", "file", CliParser::CLI_STRING, true, "filename", "Input filename (.wav, 44.1k/48k, PCM16) to mix with beeps", "");
+  cliParser.addOption("k", "key", CliParser::CLI_STRING, false, "key", "Key identifier (5 chars base32 [0-9a-v])", "");
+  cliParser.addOption("d", "duration", CliParser::CLI_FLOAT, true, "value", "Duration of output file in seconds (>=2.3, default 2.3)", "2.3");
+  cliParser.addOption("i", "interval", CliParser::CLI_FLOAT, true, "value", "Interval between beeps in seconds (>=2.3; default 2.3)", "2.3");
   cliParser.addOption("s", "start", CliParser::CLI_FLOAT, true, "value", "Start time of the first audio mark in seconds (>=0)", "0");
   cliParser.addOption("o", "output", CliParser::CLI_STRING, false, "filename", "Filename of output audio file that will be written (.wav)", "");
 
-  cliParser.addOption("x", "mixmode", CliParser::CLI_INT, true, "value", "Mixing mode (0: DefaultLevel, 1: GlobalLevel, 2: DynamicLevel)", "0");
-  cliParser.addOption("v", "volumebeeps", CliParser::CLI_FLOAT, true, "value", "Set default beeps level in DB", "-3.0"); //see Cliparser hack to allow negative values
-  cliParser.addOption("p", "volumeprogram", CliParser::CLI_FLOAT, true, "value", "Set default program level in DB", "0.0"); //see Cliparser hack to allow negative values
+  cliParser.addOption("x", "mixmode", CliParser::CLI_INT, true, "value", "Mixing mode (0: DefaultLevel, 1: GlobalLevel, 2: DynamicLevel) - only with --file", "0");
+  cliParser.addOption("v", "volumebeeps", CliParser::CLI_FLOAT, true, "value", "Set beeps level in dB (-60..12)", "-3.0"); //see Cliparser hack to allow negative values
+  cliParser.addOption("p", "volumeprogram", CliParser::CLI_FLOAT, true, "value", "Set program level in dB (only with --file)", "0.0"); //see Cliparser hack to allow negative values
 
-  cliParser.addOption("r", "samplerate", CliParser::CLI_FLOAT, true, "value", "Sampling rate for output file (e.g. 44100.0 or 48000.0)", "44100.0");
+  cliParser.addOption("r", "samplerate", CliParser::CLI_FLOAT, true, "value", "Sampling rate for output file (44100 or 48000). Ignored when --file is used", "44100.0");
 
   cliParser.addOption("l", "loudnessstatistics", CliParser::CLI_INT, true, "value", "Loudness statistics including LKFS and True Peak (0: disabled, 1:enabled)", "0");
 
-  cliParser.addOption("bf", "basefreq", CliParser::CLI_FLOAT, true, "value", "Base Frequency in Hz for beeping custom mode  (e.g. 12000.0)", "12000.0");
-  cliParser.addOption("ts", "tonesseparation", CliParser::CLI_INT, true, "value", "Separation between tones (1: minimum separation, 20:maximum separation)", "1");
+  cliParser.addOption("bf", "basefreq", CliParser::CLI_FLOAT, true, "value", "Base Frequency in Hz for beeping custom mode (e.g. 12000.0)", "12000.0");
+  cliParser.addOption("ts", "tonesseparation", CliParser::CLI_INT, true, "value", "Separation between tones (>=1, e.g. 10)", "1");
 
   cliParser.addOption("sm", "synthmode", CliParser::CLI_INT, true, "value", "Synthesis mixed with beeps (0: disabled, 1: r2d2)", "0");
-  cliParser.addOption("sv", "synthvolume", CliParser::CLI_FLOAT, true, "value", "Set volume of synth in DB related to beeps volume", "0.0");
+  cliParser.addOption("sv", "synthvolume", CliParser::CLI_FLOAT, true, "value", "Set volume of synth in dB relative to beeps (-60..12)", "0.0");
+  cliParser.addOption("n", "dry-run", CliParser::CLI_NONE, true, "", "Validate parameters and show plan without generating audio", "");
 
-  if (cliParser.parse(argc, argv) != true)
+  auto printHelp = [&]()
   {
     std::cerr << "" << std::endl;
     showVersion(0);
-    std::cerr << cliParser.generateUsageMessage();
-    return 0;
+    std::cerr << "BeepBox command line options:\n";
+    std::cerr << "  -h, --help                 Show this help and examples\n";
+    std::cerr << "  -m, --mode <int>           0 audible | 1 hidden | 2 non-audible | 3 custom (default 2)\n";
+    std::cerr << "  -k, --key <string>         Required. 5 chars base32 [0-9a-v]\n";
+    std::cerr << "  -o, --output <wav>         Required. Output WAV path\n";
+    std::cerr << "  -f, --file <wav>           Input WAV (44.1k/48k PCM16) to mix; enables mix options\n";
+    std::cerr << "  -d, --duration <float>     Duration seconds (>=2.3). Default 2.3\n";
+    std::cerr << "  -i, --interval <float>     Interval between beeps (>=2.3). Default 2.3\n";
+    std::cerr << "  -s, --start <float>        Start time for first beep (>=0). Default 0\n";
+    std::cerr << "  -x, --mixmode <int>        0 DefaultLevel | 1 GlobalLevel | 2 DynamicLevel (only with --file)\n";
+    std::cerr << "  -v, --volumebeeps <float>  Beeps level dB (-60..12). Default -3\n";
+    std::cerr << "  -p, --volumeprogram <float>Program level dB (only with --file). Default 0\n";
+    std::cerr << "  -r, --samplerate <float>   44100 or 48000 when generating beeps. Ignored if --file is used. Default 44100\n";
+    std::cerr << "  -l, --loudnessstatistics   0 disabled | 1 enabled. Default 0\n";
+    std::cerr << "  --bf, --basefreq <float>   Base freq Hz (mode 3). Default 12000\n";
+    std::cerr << "  --ts, --tonesseparation <int> Tone separation (>0) (mode 3). Default 1\n";
+    std::cerr << "  --sm, --synthmode <int>    0 disabled | 1 r2d2 (clamped). Default 0\n";
+    std::cerr << "  --sv, --synthvolume <float>Synth volume dB relative to beeps (-60..12). Default 0\n";
+    std::cerr << "  -n, --dry-run              Validate and show plan; do not generate audio\n";
+    std::cerr << "\nExamples:\n";
+    std::cerr << "  BeepBox -k 0abc1 -o beeps.wav                       # generate beeps only\n";
+    std::cerr << "  BeepBox -k 0abc1 -f input.wav -o mixed.wav          # mix beeps into WAV\n";
+    std::cerr << "  BeepBox -k 0abc1 -m 3 -bf 15000 -ts 10 -o custom.wav # custom mode\n";
+    std::cerr << "  BeepBox -n -k 0abc1 -d 5 -o plan.wav                # dry-run, show plan only\n";
+  };
+
+  if (cliParser.parse(argc, argv) != true)
+  {
+    printHelp();
+    return 1;
   }
 
   //Should be equal to the one in Globals::durToken
@@ -210,8 +241,23 @@ int main(int argc, char** argv)
   const int param_mode = cliParser.getOptionAsInt("m", 2);  
   std::string inputFnStr = cliParser.getOptionAsString("f", "");
   std::string keyStr = cliParser.getOptionAsString("k", "");
-  const bool durationProvided = cliParser.hasOption("d");
-  const bool intervalProvided = cliParser.hasOption("i");
+  auto flagProvided = [&](const std::string& shortFlag, const std::string& longFlag) {
+    std::string shortForm = "-" + shortFlag;
+    std::string longForm = "--" + longFlag;
+    for (const auto& a : rawArgs)
+    {
+      if (a == shortForm || a == longForm)
+        return true;
+    }
+    return false;
+  };
+  const bool durationProvided = flagProvided("d", "duration");
+  const bool intervalProvided = flagProvided("i", "interval");
+  const bool helpRequested = cliParser.hasOption("h");
+  const bool mixmodeProvided = flagProvided("x", "mixmode");
+  const bool volumeProgramProvided = flagProvided("p", "volumeprogram");
+  const bool samplerateProvided = flagProvided("r", "samplerate");
+  const bool dryRun = flagProvided("n", "dry-run");
   float duration = cliParser.getOptionAsFloat("d", minBeepWindow);
   float interval = cliParser.getOptionAsFloat("i", minBeepWindow);
   float startTime = cliParser.getOptionAsFloat("s", 0.0);
@@ -223,7 +269,7 @@ int main(int argc, char** argv)
 
   //double sampleRate = 44100.0;
   //float sampleRate = 22050.f;
-  const float sampleRate = cliParser.getOptionAsFloat("r", 44100.0);
+  const float userSampleRate = cliParser.getOptionAsFloat("r", 44100.0);
 
   const int loudnessStats = cliParser.getOptionAsInt("l", 0);
 
@@ -251,10 +297,30 @@ int main(int argc, char** argv)
   replaceData (certificate, "[interval]", std::to_string(interval)) ;
   replaceData (certificate, "[file]", outputFnStr) ;
 
+  if (helpRequested)
+  {
+    printHelp();
+    return 0;
+  }
+
+  auto emitError = [&](const std::string& msg) {
+    std::cerr << "Error: " << msg << std::endl;
+  };
+
+  std::vector<std::string> warnings;
+  auto warn = [&](const std::string& msg) {
+    warnings.push_back(msg);
+  };
+  auto flushWarnings = [&]() {
+    for (const auto& w : warnings)
+      std::cerr << "Warning: " << w << std::endl;
+    warnings.clear();
+  };
+
   //CHECK THAT PARAMETERS ARE CORRECT
   if (keyStr.size() != 5)
   {
-    std::cerr << "Wrong key. Please use a 5 characters only key" << std::endl;
+    emitError("Wrong key. Please use a 5 characters only key");
     return -1;
   }
   else //check that digits are valid
@@ -263,10 +329,102 @@ int main(int argc, char** argv)
     {
       if (charToVal(keyStr.c_str()[i]) == -1)
       {
-        std::cerr << "Wrong character in key [" << keyStr.c_str()[i] << "]. Please use digits in {0-9, a-v} range only" << std::endl;
+        emitError(std::string("Wrong character in key [") + keyStr.c_str()[i] + "]. Please use digits in {0-9, a-v} range only");
         return -1;
       }
     }
+  }
+
+  if (outputFnStr.empty())
+  {
+    emitError("Output file is required (--output)");
+    return -1;
+  }
+
+  if ((param_mode < 0) || (param_mode > 3))
+  {
+    emitError("Mode is not valid. Use 0 (audible), 1 (hidden), 2 (non-audible), 3 (custom)");
+    return -1;
+  }
+
+  if (param_mode == 3)
+  {
+    if (baseFreq <= 0.f)
+    {
+      emitError("Base frequency (--basefreq) must be > 0 in custom mode");
+      return -1;
+    }
+    if (tonesSeparation <= 0)
+    {
+      emitError("Tone separation (--tonesseparation) must be > 0 in custom mode");
+      return -1;
+    }
+  }
+
+  if ((mixmode < 0) || (mixmode > 2))
+  {
+    emitError("Mix mode is not valid. Use 0 (DefaultLevel), 1 (GlobalLevel), 2 (DynamicLevel)");
+    return -1;
+  }
+
+  float validatedVolumeBeeps = volumebeeps;
+  if (validatedVolumeBeeps < -60.f)
+  {
+    warn("volumebeeps clamped to -60 dB");
+    validatedVolumeBeeps = -60.f;
+  }
+  if (validatedVolumeBeeps > 12.f)
+  {
+    warn("volumebeeps clamped to 12 dB");
+    validatedVolumeBeeps = 12.f;
+  }
+
+  float validatedVolumeProgram = volumeprogram;
+  if (volumeProgramProvided && inputFnStr.empty())
+  {
+    warn("volumeprogram provided without input file; ignoring");
+    validatedVolumeProgram = 0.f;
+  }
+
+  int clampedSynthMode = synthMode;
+  if (clampedSynthMode < 0 || clampedSynthMode > 1)
+  {
+    warn("synthmode out of range; clamped to 0/1");
+    clampedSynthMode = (clampedSynthMode < 0) ? 0 : 1;
+  }
+  float clampedSynthVolume = synthVolume;
+  if (clampedSynthVolume < -60.f)
+  {
+    warn("synthvolume clamped to -60 dB");
+    clampedSynthVolume = -60.f;
+  }
+  if (clampedSynthVolume > 12.f)
+  {
+    warn("synthvolume clamped to 12 dB");
+    clampedSynthVolume = 12.f;
+  }
+
+  float effectiveSampleRate = userSampleRate;
+  if (inputFnStr.size() == 0)
+  {
+    if ((effectiveSampleRate != 44100.f) && (effectiveSampleRate != 48000.f))
+    {
+      emitError("Sampling rate must be 44100 or 48000 when generating beeps without input file");
+      return -1;
+    }
+  }
+
+  if (loudnessStats != 0 && loudnessStats != 1)
+  {
+    emitError("Loudness statistics must be 0 (disabled) or 1 (enabled)");
+    return -1;
+  }
+
+  int mixmodeToUse = mixmode;
+  if (mixmodeProvided && inputFnStr.empty())
+  {
+    emitError("Mixmode requires an input file (--file). Provide -f with a WAV to mix.");
+    return -1;
   }
 
   float min_interval = minBeepWindow;
@@ -274,7 +432,7 @@ int main(int argc, char** argv)
 
   if (intervalProvided && interval < min_interval)
   {
-    std::cerr << "Interval too short. The minimum allowed interval is " << min_interval << " seconds" << std::endl;
+    emitError("Interval too short. The minimum allowed interval is 2.3 seconds");
     return -1;
   }
   if (!intervalProvided)
@@ -282,17 +440,17 @@ int main(int argc, char** argv)
 
   if (duration < min_duration)
   {
-    std::cerr << "Duration too short. The minimum allowed duration is " << min_duration << " seconds (start time + beep length)" << std::endl;
+    emitError("Duration too short. Minimum is 2.3s and must satisfy start + 2.3 <= duration");
     return -1;
   }
   if (duration > 86400.f) //24 hours of wav 44Khz 16 bits mono is 7.620.480.000 bytes
   { //1 hour is 317.520.000 bytes (317 Mbytes)
-    std::cerr << "Duration too big. The maximum allowed duration is 86400 seconds (=24 hours)" << std::endl;
+    emitError("Duration too big. The maximum allowed duration is 86400 seconds (=24 hours)");
     return -1;
   }
   if ((startTime > duration) || (startTime < 0.f)) //valid start time for first audio mark
   {
-    std::cerr << "Start time is not valid. It should be >= 0 secs." << std::endl;
+    emitError("Start time is not valid. It should be >= 0 secs.");
     return -1;
   }
 
@@ -307,6 +465,66 @@ int main(int argc, char** argv)
     return 1 + MAX(extra, 0);
   };
 
+  auto computeBeepSchedule = [&](float effectiveDuration, float currentInterval) -> std::vector<double>
+  {
+    std::vector<double> times;
+    int count = computeBeepCount(effectiveDuration, currentInterval);
+    double t = startTime;
+    while ((int)times.size() < count && (t + minBeepWindow) <= effectiveDuration + 1e-6)
+    {
+      times.push_back(t);
+      t += currentInterval;
+    }
+    return times;
+  };
+
+  auto modeName = [&](int m) -> std::string {
+    switch (m)
+    {
+      case 0: return "audible";
+      case 1: return "hidden";
+      case 2: return "non-audible";
+      case 3: return "custom";
+      default: return "unknown";
+    }
+  };
+
+  auto printPlan = [&](float effectiveDuration, float effectiveInterval, float effectiveStart, float effectiveSamplerate, int beepsToGenerate, const std::vector<double>& schedule, const std::string& inputFile, int mixMode, float volBeeps, float volProgram) {
+    flushWarnings();
+    std::cout << "Dry-run plan:" << std::endl;
+    std::cout << "  key:          " << keyStr << std::endl;
+    std::cout << "  mode:         " << param_mode << " (" << modeName(param_mode) << ")" << std::endl;
+    std::cout << "  duration:     " << effectiveDuration << " s" << std::endl;
+    std::cout << "  interval:     " << effectiveInterval << " s" << std::endl;
+    std::cout << "  start:        " << effectiveStart << " s" << std::endl;
+    std::cout << "  samplerate:   " << effectiveSamplerate << " Hz" << std::endl;
+    std::cout << "  output:       " << outputFnStr << std::endl;
+    if (!inputFile.empty())
+    {
+      std::cout << "  input:        " << inputFile << std::endl;
+      std::cout << "  mixmode:      " << mixMode << std::endl;
+      std::cout << "  volume beeps: " << volBeeps << " dB" << std::endl;
+      std::cout << "  volume prog:  " << volProgram << " dB" << std::endl;
+    }
+    std::cout << "  beeps:        " << beepsToGenerate << std::endl;
+    std::cout << "  timestamps:   ";
+    int shown = 0;
+    for (double t : schedule)
+    {
+      if (shown >= 20)
+      {
+        std::cout << "...";
+        break;
+      }
+      if (shown > 0) std::cout << ", ";
+      std::cout << t;
+      shown++;
+    }
+    if (schedule.size() > 20)
+      std::cout << " (total " << schedule.size() << ")";
+    std::cout << std::endl;
+  };
+
   //enum BEEPING_MODE { BEEPING_MODE_AUDIBLEOLD = 0, BEEPING_MODE_NONAUDIBLEOLD = 1, BEEPING_MODE_AUDIBLE = 2, BEEPING_MODE_NONAUDIBLE = 3, BEEPING_MODE_HIDDEN = 4, BEEPING_MODE_ALL = 5, BEEPING_MODE_CUSTOM = 6 };
   int mode = /*BEEPING_MODE::*/BEEPING_MODE_NONAUDIBLE; //2 audible, 3 non-audible
   if (param_mode == 0)
@@ -318,22 +536,17 @@ int main(int argc, char** argv)
   else if (param_mode == 3)
     mode = /*BEEPING_MODE::*/BEEPING_MODE_CUSTOM;
 
+  auto setupCore = [&]() {
+    mBeepingCore = BEEPING_Create();
+    if (param_mode == 3)
+    {
+      BEEPING_SetCustomBaseFreq(baseFreq, tonesSeparation, mBeepingCore);
+    }
+    BEEPING_SetSynthMode(clampedSynthMode, mBeepingCore);
+    BEEPING_SetSynthVolume(clampedSynthVolume, mBeepingCore);
+    BEEPING_createCertificate(certificate.c_str(), mBeepingCore);
+  };
 
-  //Creation
-  mBeepingCore = BEEPING_Create();
-
-  if (param_mode == 3)
-  {
-    //float baseFreq = 100.f;
-    //int tonesSeparation = 25;
-    BEEPING_SetCustomBaseFreq(baseFreq, tonesSeparation, mBeepingCore);
-  }
-
-  BEEPING_SetSynthMode(synthMode, mBeepingCore);
-  BEEPING_SetSynthVolume(synthVolume, mBeepingCore);
-
-  // Creating certificate
-  BEEPING_createCertificate(certificate.c_str(), mBeepingCore) ;
 
   //OUTPUT FILE
   SF_INFO sfinfoOutput;
@@ -345,22 +558,33 @@ int main(int argc, char** argv)
     int beepsToGenerate = computeBeepCount(duration, interval);
     if (beepsToGenerate <= 0)
     {
-      std::cerr << "Duration too short. The minimum allowed duration is " << min_duration << " seconds (start time + beep length)" << std::endl;
+      emitError("Duration too short. Minimum is 2.3s and must satisfy start + 2.3 <= duration");
       return -1;
     }
     if (intervalProvided && beepsToGenerate == 1)
     {
-      std::cerr << "Warning: interval=" << interval << "s ignored because duration=" << duration << "s only fits one beep (" << minBeepWindow << "s)." << std::endl;
+      warn("interval=" + std::to_string(interval) + "s ignored because duration=" + std::to_string(duration) + "s only fits one beep (" + std::to_string(minBeepWindow) + "s).");
     }
 
+    std::vector<double> schedule = computeBeepSchedule(duration, interval);
+
+    if (dryRun)
+    {
+      printPlan(duration, interval, startTime, effectiveSampleRate, beepsToGenerate, schedule, "", mixmodeToUse, validatedVolumeBeeps, validatedVolumeProgram);
+      return 0;
+    }
+
+    flushWarnings();
+
     //Configuration
-    BEEPING_Configure(mode, sampleRate, bufferSize, mBeepingCore);
+    setupCore();
+    BEEPING_Configure(mode, effectiveSampleRate, bufferSize, mBeepingCore);
 
     //CREATE OUTPUT AUDIO FILE
     sfinfoOutput.format = SF_FORMAT_WAV | SF_FORMAT_PCM_16;
     sfinfoOutput.channels = 1; //or 2
     sfinfoOutput.frames = 0;
-    sfinfoOutput.samplerate = (int)sampleRate;
+    sfinfoOutput.samplerate = (int)effectiveSampleRate;
 
     pWaveFileOutput = sf_open(outputFnStr.c_str(), SFM_WRITE, &sfinfoOutput);
     if (!pWaveFileOutput)
@@ -373,7 +597,7 @@ int main(int argc, char** argv)
     double nextMarkTime = currentTimeInSeconds + startTime;
     int beepsGenerated = 0;
 
-    float defBeepLevel = pow(10.f, volumebeeps / 20.f);
+    float defBeepLevel = pow(10.f, validatedVolumeBeeps / 20.f);
 
     //PINK NOISE
     //VRand rand;
@@ -448,8 +672,8 @@ int main(int argc, char** argv)
 
           int count = (int)sf_write_float(pWaveFileOutput, audioBuffer, samplesRetrieved);
 
-          currentTimeInSeconds = currentTimeInSeconds + (double)samplesRetrieved / sampleRate;
-          //currentTimeInSeconds = currentTimeInSeconds + bufferSize/sampleRate;
+          currentTimeInSeconds = currentTimeInSeconds + (double)samplesRetrieved / effectiveSampleRate;
+          //currentTimeInSeconds = currentTimeInSeconds + bufferSize/effectiveSampleRate;
         } while (samplesRetrieved > 0);
 
         //add silence at the end of file
@@ -465,7 +689,7 @@ int main(int argc, char** argv)
       {
         //add silence between marks
         sf_write_float(pWaveFileOutput, silenceBuffer, bufferSize);
-        currentTimeInSeconds = currentTimeInSeconds + bufferSize / sampleRate;
+        currentTimeInSeconds = currentTimeInSeconds + bufferSize / effectiveSampleRate;
       }
     }
 
@@ -486,16 +710,16 @@ int main(int argc, char** argv)
 
     long nFrames;
     int nch;
-    float sampleRate;
+    float fileSampleRate;
     int buffersamples = 4096;
 
     if (pWaveFileInput) // read Input File to buffer
     {
       nFrames = sfinfoInput.frames;
       nch = (int)sfinfoInput.channels;
-      sampleRate = (float)sfinfoInput.samplerate;
+      fileSampleRate = (float)sfinfoInput.samplerate;
 
-      if ((sampleRate != 44100.f) && (sampleRate != 48000.f))
+      if ((fileSampleRate != 44100.f) && (fileSampleRate != 48000.f))
       {
         printf("%s is not a valid Wav File! Please use 44.1Khz or 48Khz 16bits PCM Wave File\n", inputFnStr.c_str());
         sf_close(pWaveFileInput);
@@ -503,13 +727,18 @@ int main(int argc, char** argv)
       }
 
       //Configuration
-      BEEPING_Configure(mode, sampleRate, bufferSize, mBeepingCore);
+      if (cliParser.hasOption("r") && (fabs(userSampleRate - fileSampleRate) > 1e-3f))
+      {
+        warn("Samplerate option ignored; using input file samplerate");
+      }
+      setupCore();
+      BEEPING_Configure(mode, fileSampleRate, bufferSize, mBeepingCore);
 
       //CREATE OUTPUT AUDIO FILE
       sfinfoOutput.format = SF_FORMAT_WAV | SF_FORMAT_PCM_16;
       sfinfoOutput.channels = 1; //or 2
       sfinfoOutput.frames = 0;
-      sfinfoOutput.samplerate = (int)sampleRate;
+      sfinfoOutput.samplerate = (int)fileSampleRate;
 
       pWaveFileOutput = sf_open(outputFnStr.c_str(), SFM_WRITE, &sfinfoOutput);
       if (!pWaveFileOutput)
@@ -560,10 +789,10 @@ int main(int argc, char** argv)
     int progress_beeps = 0;
     std::cout << "Progress BEEPS = " << progress_beeps << std::endl;
 
-    float *pBeepsBuffer = new float[nFrames + (int)((durToken*20.f)*sampleRate)]; //added duration of one beep message just to avoid buffer overflow when beep starts at the end of file (not sure it is needed though)
+    float *pBeepsBuffer = new float[nFrames + (int)((durToken*20.f)*fileSampleRate)]; //added duration of one beep message just to avoid buffer overflow when beep starts at the end of file (not sure it is needed though)
     memset(pBeepsBuffer, 0, nFrames*sizeof(float));
 
-    float input_duration = nFrames / sampleRate;
+    float input_duration = nFrames / fileSampleRate;
     long counterSamples = 0;
     double currentTimeInSeconds = 0.0;
     double nextMarkTime = currentTimeInSeconds + startTime;
@@ -571,15 +800,25 @@ int main(int argc, char** argv)
     int beepsToGenerate = computeBeepCount(input_duration, interval);
     if (beepsToGenerate <= 0)
     {
-      std::cerr << "Duration too short for input file. The minimum allowed duration is " << min_duration << " seconds (start time + beep length)" << std::endl;
+      emitError("Duration too short for input file. Minimum is 2.3s and must satisfy start + 2.3 <= duration");
       return -1;
     }
     if (intervalProvided && beepsToGenerate == 1)
     {
-      std::cerr << "Warning: interval=" << interval << "s ignored because duration=" << input_duration << "s only fits one beep (" << minBeepWindow << "s)." << std::endl;
+      warn("interval=" + std::to_string(interval) + "s ignored because duration=" + std::to_string(input_duration) + "s only fits one beep (" + std::to_string(minBeepWindow) + "s).");
     }
 
-    while (currentTimeInSeconds < (input_duration-(bufferSize/sampleRate))) //todo:
+    std::vector<double> schedule = computeBeepSchedule(input_duration, interval);
+
+    if (dryRun)
+    {
+      printPlan(input_duration, interval, startTime, fileSampleRate, beepsToGenerate, schedule, inputFnStr, mixmodeToUse, validatedVolumeBeeps, validatedVolumeProgram);
+      return 0;
+    }
+
+    flushWarnings();
+
+    while (currentTimeInSeconds < (input_duration-(bufferSize/fileSampleRate))) //todo:
     {
       float current_progress_beeps = (currentTimeInSeconds / input_duration)*100.f;
       if (current_progress_beeps > progress_beeps + 5)
@@ -631,8 +870,8 @@ int main(int argc, char** argv)
 
           //int count = (int)sf_write_float(pWaveFileOutput, audioBuffer, samplesRetrieved);
 
-          currentTimeInSeconds = currentTimeInSeconds + (double)samplesRetrieved / sampleRate;
-          //currentTimeInSeconds = currentTimeInSeconds + bufferSize/sampleRate;
+          currentTimeInSeconds = currentTimeInSeconds + (double)samplesRetrieved / fileSampleRate;
+          //currentTimeInSeconds = currentTimeInSeconds + bufferSize/fileSampleRate;
         } while (samplesRetrieved > 0);
 
         //add silence at the end of file
@@ -649,7 +888,7 @@ int main(int argc, char** argv)
         //add silence between marks
         //sf_write_float(pWaveFileOutput, silenceBuffer, bufferSize);
         counterSamples += bufferSize;
-        currentTimeInSeconds = currentTimeInSeconds + bufferSize / sampleRate;
+        currentTimeInSeconds = currentTimeInSeconds + bufferSize / fileSampleRate;
       }
     }
 
@@ -657,11 +896,11 @@ int main(int argc, char** argv)
 
     //MIX BUFFERS
     Mixer mixer;
-    mixer.setBeepLevel(volumebeeps);
+    mixer.setBeepLevel(validatedVolumeBeeps);
     mixer.setMinBeepLevel(-20.f);
-    mixer.setProgramLevel(volumeprogram);
+    mixer.setProgramLevel(validatedVolumeProgram);
     //mixer.setSmoothTime(float time);
-    mixer.setMode(mixmode);
+    mixer.setMode(mixmodeToUse);
     mixer.setUseNormalize(false);
 
     float **ppMixedBuffer = new float*[nch];
@@ -669,7 +908,7 @@ int main(int argc, char** argv)
       ppMixedBuffer[i] = new float[nFrames];
 
     //mixer.mix(const float** bufferPgm, const int nsamples, int nchannels, const float samplerate, const float* bufferBeeps, float** bufferMix);
-    mixer.mix((const float**)ppInputBuffer, nFrames, nch, sampleRate, pBeepsBuffer, ppMixedBuffer);
+    mixer.mix((const float**)ppInputBuffer, nFrames, nch, fileSampleRate, pBeepsBuffer, ppMixedBuffer);
 
     //Bypass
     /*for (int t=0;t<nch;t++)
@@ -782,9 +1021,11 @@ int main(int argc, char** argv)
   }
 
   //Destroy
-  BEEPING_Destroy(mBeepingCore);
+  if (mBeepingCore)
+    BEEPING_Destroy(mBeepingCore);
 
-  sf_close(pWaveFileOutput);
+  if (pWaveFileOutput)
+    sf_close(pWaveFileOutput);
 
   total_end = clock();
   double totalDuration = double(total_end - total_start) / (double)CLOCKS_PER_SEC;
