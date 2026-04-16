@@ -117,16 +117,56 @@ install(DIRECTORY include/beepbox/
   FILES_MATCHING PATTERN "*.h"
 )
 
+# --- Sanitizers ---
+
+option(BEEPBOX_ENABLE_TSAN "Build with ThreadSanitizer (Clang/GCC only)" OFF)
+
+if(BEEPBOX_ENABLE_TSAN)
+  add_compile_options(-fsanitize=thread -g)
+  add_link_options(-fsanitize=thread)
+endif()
+
 # --- Tests ---
 
 if(BUILD_TESTING)
-  add_test(NAME BeepBox_GenerateBeeps
+  FetchContent_Declare(
+    Catch2
+    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+    GIT_TAG        v3.7.1
+    GIT_SHALLOW    TRUE
+  )
+  FetchContent_MakeAvailable(Catch2)
+
+  add_executable(BeepBoxTests
+    tests/Base32Tests.cpp
+    tests/ParamsTests.cpp
+    tests/SchedulerTests.cpp
+    tests/GeneratorTests.cpp
+    tests/RoundTripTests.cpp
+    tests/ConcurrencyTests.cpp
+  )
+
+  target_link_libraries(BeepBoxTests PRIVATE beepbox_lib Catch2::Catch2WithMain)
+  target_include_directories(BeepBoxTests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+  )
+
+  if(NOT WIN32)
+    target_link_libraries(BeepBoxTests PRIVATE pthread)
+  endif()
+
+  list(APPEND CMAKE_MODULE_PATH ${Catch2_SOURCE_DIR}/extras)
+  include(Catch)
+  catch_discover_tests(BeepBoxTests)
+
+  # CLI smoke tests
+  add_test(NAME CLI_GenerateBeeps
            COMMAND BeepBox -k 00001 -o ${CMAKE_BINARY_DIR}/test_gen.wav -d 2.3 -m inaudible)
 
-  add_test(NAME BeepBox_DryRun
+  add_test(NAME CLI_DryRun
            COMMAND BeepBox -k 00001 -o ${CMAKE_BINARY_DIR}/test_dry.wav -n)
 
-  add_test(NAME BeepBox_TooShortFails
+  add_test(NAME CLI_TooShortFails
            COMMAND BeepBox -k 00001 -o ${CMAKE_BINARY_DIR}/test_fail.wav -d 1.0)
-  set_tests_properties(BeepBox_TooShortFails PROPERTIES WILL_FAIL TRUE)
+  set_tests_properties(CLI_TooShortFails PROPERTIES WILL_FAIL TRUE)
 endif()
