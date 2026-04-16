@@ -3,9 +3,12 @@
 #include "beepbox/Generator.h"
 #include "beepbox/Params.h"
 #include "beepbox/WavWriter.h"
+#include "beepbox/WavReader.h"
 
 #include <iostream>
 #include <string>
+#include <algorithm>
+#include <vector>
 
 using namespace drogon;
 
@@ -129,6 +132,83 @@ int main() {
         resp->addHeader("X-Beeps-Generated",
                         std::to_string(result.beepsGenerated));
         resp->setStatusCode(k200OK);
+        callback(resp);
+      },
+      {Post});
+
+  // --- POST /v1/decode — decode WAV audio to payload ---
+  app().registerHandler(
+      "/v1/decode",
+      [](const HttpRequestPtr& req,
+         std::function<void(const HttpResponsePtr&)>&& callback) {
+        const auto& body = req->body();
+        if (body.empty()) {
+          auto resp = HttpResponse::newHttpJsonResponse(
+              Json::Value(Json::objectValue));
+          (*resp->getJsonObject())["error"] = "Empty body. Send WAV audio data.";
+          resp->setStatusCode(k400BadRequest);
+          callback(resp);
+          return;
+        }
+
+        // Parse WAV
+        auto wav = beepbox::fromWav(body.data(), body.size());
+        if (!wav.valid) {
+          auto resp = HttpResponse::newHttpJsonResponse(
+              Json::Value(Json::objectValue));
+          (*resp->getJsonObject())["error"] = "Invalid WAV: " + wav.error;
+          resp->setStatusCode(k400BadRequest);
+          callback(resp);
+          return;
+        }
+
+        // Decode using ALL mode (auto-detects audible/inaudible)
+        constexpr int kChunk = 1024;
+        void* core = BEEPING_Create();
+        BEEPING_Configure(BEEPING_MODE_ALL, static_cast<float>(wav.sampleRate),
+                          kChunk, core);
+
+        int status = -1;
+        int totalSamples = static_cast<int>(wav.samples.size());
+        for (int offset = 0; offset < totalSamples; offset += kChunk) {
+          int chunkSize = std::min(kChunk, totalSamples - offset);
+          status = BEEPING_DecodeAudioBuffer(wav.samples.data() + offset,
+                                             chunkSize, core);
+          if (status == -3) break;
+        }
+
+        // Flush with silence
+        if (status != -3) {
+          std::vector<float> silence(kChunk, 0.0f);
+          for (int flush = 0; flush < 200; ++flush) {
+            status = BEEPING_DecodeAudioBuffer(silence.data(), kChunk, core);
+            if (status == -3) break;
+          }
+        }
+
+        auto resp = HttpResponse::newHttpJsonResponse(
+            Json::Value(Json::objectValue));
+        auto& json = *resp->getJsonObject();
+
+        if (status == -3) {
+          char buf[256] = {};
+          int rc = BEEPING_GetDecodedData(buf, core);
+          if (rc > 0) {
+            json["decoded"] = std::string(buf, rc);
+            json["confidence"] = BEEPING_GetConfidence(core);
+            json["mode"] = BEEPING_GetDecodedMode(core);
+            resp->setStatusCode(k200OK);
+          } else {
+            json["error"] = "Decode returned invalid data";
+            resp->setStatusCode(k422UnprocessableEntity);
+          }
+        } else {
+          json["error"] = "No beeping data found in audio";
+          json["hint"] = "Ensure the WAV contains encoded beeps (audible or inaudible)";
+          resp->setStatusCode(k404NotFound);
+        }
+
+        BEEPING_Destroy(core);
         callback(resp);
       },
       {Post});

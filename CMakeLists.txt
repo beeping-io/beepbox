@@ -69,6 +69,7 @@ add_library(beepbox_lib STATIC
   src/Mixer.cpp
   src/VRand.cpp
   src/WavWriter.cpp
+  src/WavReader.cpp
 )
 
 target_include_directories(beepbox_lib PUBLIC
