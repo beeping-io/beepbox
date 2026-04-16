@@ -17,17 +17,33 @@ set(BUILD_SHARED_LIBS OFF)
 
 enable_testing()
 
-# --- Dependencies via FetchContent ---
+# --- beeping-core (dual-mode: Conan find_package or FetchContent fallback) ---
+
+option(BEEPBOX_USE_EXTERNAL_BEEPING_CORE
+  "Resolve beeping-core via find_package() instead of FetchContent"
+  OFF)
+
+# Auto-enable when a Conan toolchain is active
+if(DEFINED CMAKE_TOOLCHAIN_FILE AND
+   CMAKE_TOOLCHAIN_FILE MATCHES "conan_toolchain\\.cmake$")
+  set(BEEPBOX_USE_EXTERNAL_BEEPING_CORE ON CACHE BOOL "" FORCE)
+endif()
 
 include(FetchContent)
 
-FetchContent_Declare(
-  BeepingCore
-  GIT_REPOSITORY https://github.com/beeping-io/beeping-core.git
-  GIT_TAG        v0.0.0
-  GIT_SHALLOW    TRUE
-)
-FetchContent_MakeAvailable(BeepingCore)
+if(BEEPBOX_USE_EXTERNAL_BEEPING_CORE)
+  find_package(BeepingCore REQUIRED CONFIG)
+else()
+  FetchContent_Declare(
+    BeepingCore
+    GIT_REPOSITORY https://github.com/beeping-io/beeping-core.git
+    GIT_TAG        v0.0.0
+    GIT_SHALLOW    TRUE
+  )
+  FetchContent_MakeAvailable(BeepingCore)
+endif()
+
+# --- libebur128 (FetchContent always — not on ConanCenter) ---
 
 FetchContent_Declare(
   libebur128
@@ -59,7 +75,11 @@ target_include_directories(beepbox_lib PUBLIC
   $<INSTALL_INTERFACE:include>
 )
 
-target_link_libraries(beepbox_lib PUBLIC BeepingCore ebur128)
+if(BEEPBOX_USE_EXTERNAL_BEEPING_CORE)
+  target_link_libraries(beepbox_lib PUBLIC BeepingCore::BeepingCore ebur128)
+else()
+  target_link_libraries(beepbox_lib PUBLIC BeepingCore ebur128)
+endif()
 target_compile_features(beepbox_lib PUBLIC cxx_std_20)
 
 # --- BeepBox CLI (thin wrapper with file I/O) ---
