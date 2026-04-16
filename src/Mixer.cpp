@@ -6,8 +6,6 @@
 
 #include <Mixer.h>
 
-#include <strstream>
-#include <iostream>
 #include <algorithm>
 #include <cmath> // for M_PI define
 
@@ -22,7 +20,6 @@
 int Mixer::mix(const float** bufferPgm, const int nsamples, int nchannels, const float samplerate, const float* bufferBeeps, float** bufferMix)
 {
   progress_mix = 0;
-  std::cout << "Progress MIX = " << progress_mix << std::endl;
 
   std::vector<float> timestamps;
   std::vector<float> beepLevel;
@@ -35,8 +32,6 @@ int Mixer::mix(const float** bufferPgm, const int nsamples, int nchannels, const
   float defBeepLevel = pow(10.f, mDefaultBeepLevel/20.f);
   float defPgmLevel = pow(10.f, mDefaultProgramLevel/20.f);
   
-  std::cout << "Progress MIX = " << 95 << std::endl;
-
   float maxpeak = 0.;
   if (mMode == kDynamicLevelMode)
   {
@@ -101,8 +96,6 @@ int Mixer::mix(const float** bufferPgm, const int nsamples, int nchannels, const
       for (int j=0; j < nchannels; j++)
         bufferMix[j][i] /= maxpeak;
   
-  std::cout << "Progress MIX = " << 100 << std::endl;
-
   return 0;
 }
 
@@ -122,13 +115,8 @@ int Mixer::computeBeepLevel(const float* buffer, const int nsamples,  const floa
   
   computeEnergy(buffer, nsamples, samplerate, frametime, timestamps, energy);
   
-  std::cout << "Progress MIX = " << 75 << std::endl;
-  
   computeDynamicsStability(energy, frametime, energyDB, stab, percentile10);
 
-  std::cout << "Progress MIX = " << 90 << std::endl;
-  
-  
   // Program Typical levels:
   // - comercial Rock music: [-5..-35dB]
   // - acoustic pop music: [-12..-40dB]
@@ -178,13 +166,6 @@ int Mixer::computeEnergy(const float *buffer, const int nsamples,  const float s
   int i,k;
   for (i=0; i<nFrames; i++) {
     
-    float current_progress_mix = ((float)i / (float)nFrames)*75.f; //from 0% to 75%
-    if (current_progress_mix > progress_mix + 5)
-    {
-      progress_mix = current_progress_mix;
-      std::cout << "Progress MIX = " << progress_mix << std::endl;
-    }
-
     // compute energy for one window frame
     int b = h*i-hws;
     int e = h*i+hws;
@@ -229,8 +210,6 @@ int Mixer::computeDynamicsStability(const std::vector<float> energy, float frame
     ew.push_back( edB );
   }
   
-  std::cout << "Progress MIX = " << 80 << std::endl;
-
   // compute range of energy weight
   std::sort(ew.begin(),ew.end());
   int per10Idx =  floor(float(ew.size()) * .1f);
@@ -266,8 +245,6 @@ int Mixer::computeDynamicsStability(const std::vector<float> energy, float frame
     
   }
   
-  std::cout << "Progress MIX = " << 85 << std::endl;
-
   st[st.size()-2] = 0.f;
   st[st.size()-1] = 0.f;
   for(int i=0; i<nFr-1; i++) // square to increase binary behaviour at boundaries
