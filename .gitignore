@@ -50,4 +50,6 @@ build
 include/configure.h
 
 # Beeps
-beeps
+beeps.cache/
+logs/
+build/

@@ -1,115 +1,112 @@
-# CMake Mininum Version
-cmake_minimum_required(VERSION 3.5)
-project(BeepBox LANGUAGES C CXX)
+cmake_minimum_required(VERSION 3.25)
 
-# Enable clean Files
-message(STATUS "Enabling ADDITIONAL_CLEAN_FILES on directory level ...")
-option(ENABLE_DIRECTORY_CLEAN ON)
+project(BeepBox
+  VERSION 0.0.0
+  DESCRIPTION "C++20 tool for encoding data over sound — CLI + library"
+  HOMEPAGE_URL "https://github.com/beeping-io/beepbox"
+  LANGUAGES CXX
+)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+option(BUILD_TESTING "Build tests" ON)
+set(BUILD_SHARED_LIBS OFF)
 
 enable_testing()
 
-# Linking Core Depedendency Library as Static
-set(BUILD_SHARED_LIBS OFF)
+# --- Dependencies via FetchContent ---
 
-# Adding CMake list dependencies
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+include(FetchContent)
 
-# Setting text colors
-include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/__arch/FindColors.cmake")
-
-# Checking build directory
-include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/__arch/FindBuildDirectory.cmake")
-
-# Configure Operating System
-include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/__arch/FindOS.cmake")
-
-# Adding old compatibilities
-set(CMAKE_PROJECT_INCLUDE_BEFORE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/__deps/EnablePolicies.cmake")
-
-# Adding installation dependencies
-set(CMAKE_INSTALL_INCLUDEDIR  "${CMAKE_BINARY_DIR}/include")
-set(CMAKE_INSTALL_LIBDIR "${CMAKE_BINARY_DIR}/lib")
-
-# Adding beepingcore dependency
-include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/__deps/GetDependencies.cmake")
-
-# Setting binary instalation directory
-set(BEEPBOX_INSTALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
-
-# Specifying the files to be cleaned
-list(APPEND BEEPBOX_FILES_TO_CLEAN "${CMAKE_CURRENT_SOURCE_DIR}/lib")
-list(APPEND BEEPBOX_FILES_TO_CLEAN "${CMAKE_CURRENT_SOURCE_DIR}/bin")
-list(APPEND BEEPBOX_FILES_TO_CLEAN "${CMAKE_CURRENT_SOURCE_DIR}/build")
-
-# Activate make clean function
-set_directory_properties(
-    PROPERTIES
-    ADDITIONAL_CLEAN_FILES 
-    "${BEEPBOX_FILES_TO_CLEAN}"
-)
-
-# Include LibSndFile
-include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindSndFile.cmake")
-
-# Check whether LibSndFile is installed
-if ( NOT LIBSNDFILE_FOUND )
-  # LibSndFile is not installed
-  # Formatting
-  message("\n")
-
-  # Sending Error
-  message(STATUS "${BoldGreen}Please, read the message:${ColourReset}")
-  message(STATUS "${BoldGreen}LibSndFile must to be installed as a dependency${ColourReset}")
-   
-  # Formatting
-  message("\n")
-
-  message(STATUS "${BoldGreen}Please, execute the following command:${ColourReset}")    
-  
-  # Search for the right information command
-  include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/__arch/FindError.cmake")
-
-  # Formatting
-  message("\n")
-   
-  # Exit
-  message(FATAL_ERROR "${Blue}Please fix the errors explained above.{ColourReset}")
-
-endif()
-
-# Compiling Beepbox
-add_executable(BeepBox    
-    src/BeepBoxMain.cpp
-    src/Mixer.cpp
-    src/LoudnessStats.cpp
-)
- 
-# Setup include directories
-target_include_directories(BeepBox PUBLIC 
-	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
- 	$<INSTALL_INTERFACE:include>
-  ${LIBSNDFILE_INCLUDE_DIRS}
-  ${LIBEBUR128_INCLUDE_DIRS}
-)
-
-# Setup link libraries
-target_link_libraries(BeepBox 
-  ${LIBSNDFILE_LIBRARIES}
+FetchContent_Declare(
   BeepingCore
-  ebur128
+  GIT_REPOSITORY https://github.com/beeping-io/beeping-core.git
+  GIT_TAG        v0.0.0
+  GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(BeepingCore)
+
+FetchContent_Declare(
+  libebur128
+  GIT_REPOSITORY https://github.com/jiixyj/libebur128.git
+  GIT_TAG        v1.2.6
+  GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(libebur128)
+
+# --- System dependency: libsndfile ---
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(SNDFILE REQUIRED sndfile)
+
+# --- libbeepbox (pure logic, no I/O) ---
+
+add_library(beepbox_lib STATIC
+  src/Base32.cpp
+  src/Params.cpp
+  src/Scheduler.cpp
+  src/Generator.cpp
+  src/Mixer.cpp
+  src/VRand.cpp
 )
 
-# Install Targets
-install(TARGETS BeepBox
-        EXPORT BeepBoxTargets
-        RUNTIME DESTINATION ${BEEPBOX_INSTALL_DIR}/bin 
-		    ARCHIVE DESTINATION ${BEEPBOX_INSTALL_DIR}/lib
-		    LIBRARY DESTINATION ${BEEPBOX_INSTALL_DIR}/lib
+target_include_directories(beepbox_lib PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
 )
 
-add_test(NAME BeepBoxDuration_MinimumPass
-         COMMAND BeepBox -k 00001 -o ${CMAKE_BINARY_DIR}/duration_min_ok.wav -d 2.3)
+target_link_libraries(beepbox_lib PUBLIC BeepingCore ebur128)
+target_compile_features(beepbox_lib PUBLIC cxx_std_20)
 
-add_test(NAME BeepBoxDuration_TooShortFail
-         COMMAND BeepBox -k 00001 -o ${CMAKE_BINARY_DIR}/duration_min_fail.wav -d 2.29)
-set_tests_properties(BeepBoxDuration_TooShortFail PROPERTIES WILL_FAIL TRUE)
+# --- BeepBox CLI (thin wrapper with file I/O) ---
+
+add_executable(BeepBox
+  src/main.cpp
+  src/LoudnessStats.cpp
+)
+
+target_include_directories(BeepBox PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${SNDFILE_INCLUDE_DIRS}
+  ${libebur128_SOURCE_DIR}/ebur128
+)
+
+target_link_directories(BeepBox PRIVATE ${SNDFILE_LIBRARY_DIRS})
+target_link_libraries(BeepBox PRIVATE
+  beepbox_lib
+  ${SNDFILE_LIBRARIES}
+)
+
+# --- Install ---
+
+include(GNUInstallDirs)
+
+install(TARGETS beepbox_lib BeepBox
+  EXPORT BeepBoxTargets
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+install(DIRECTORY include/beepbox/
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/beepbox
+  FILES_MATCHING PATTERN "*.h"
+)
+
+# --- Tests ---
+
+if(BUILD_TESTING)
+  add_test(NAME BeepBox_GenerateBeeps
+           COMMAND BeepBox -k 00001 -o ${CMAKE_BINARY_DIR}/test_gen.wav -d 2.3 -m inaudible)
+
+  add_test(NAME BeepBox_DryRun
+           COMMAND BeepBox -k 00001 -o ${CMAKE_BINARY_DIR}/test_dry.wav -n)
+
+  add_test(NAME BeepBox_TooShortFails
+           COMMAND BeepBox -k 00001 -o ${CMAKE_BINARY_DIR}/test_fail.wav -d 1.0)
+  set_tests_properties(BeepBox_TooShortFails PROPERTIES WILL_FAIL TRUE)
+endif()
