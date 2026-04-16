@@ -101,6 +101,40 @@ target_link_libraries(BeepBox PRIVATE
   ${SNDFILE_LIBRARIES}
 )
 
+# --- Drogon HTTP framework ---
+
+option(BEEPBOX_BUILD_SERVER "Build the beepbox-server HTTP executable" ON)
+
+if(BEEPBOX_BUILD_SERVER)
+  # Drogon minimal: no ORM, no examples, no tests
+  set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+  set(BUILD_CTL OFF CACHE BOOL "" FORCE)
+  set(BUILD_ORM OFF CACHE BOOL "" FORCE)
+  set(BUILD_DROGON_SHARED OFF CACHE BOOL "" FORCE)
+  set(BUILD_DOC OFF CACHE BOOL "" FORCE)
+
+  FetchContent_Declare(
+    drogon
+    GIT_REPOSITORY https://github.com/drogonframework/drogon.git
+    GIT_TAG        v1.9.8
+    GIT_SHALLOW    TRUE
+  )
+  FetchContent_MakeAvailable(drogon)
+
+  add_executable(beepbox-server
+    src/server_main.cpp
+  )
+
+  target_include_directories(beepbox-server PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+  )
+
+  target_link_libraries(beepbox-server PRIVATE
+    beepbox_lib
+    drogon
+  )
+endif()
+
 # --- Install ---
 
 include(GNUInstallDirs)
