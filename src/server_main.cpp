@@ -10,6 +10,8 @@
 #include "beepbox/Tracing.h"
 
 #include <chrono>
+#include <csignal>
+#include <cstdlib>
 #include <iostream>
 #include <string>
 #include <algorithm>
@@ -394,10 +396,27 @@ int main() {
       },
       {Get});
 
-  std::cout << "beepbox-server starting on 0.0.0.0:8080\n";
+  // --- Graceful shutdown ---
+  auto shutdownHandler = [](int sig) {
+    std::cout << "{\"severity\":\"INFO\",\"message\":\"Received signal "
+              << sig << ", shutting down...\"}\n";
+    app().quit();
+  };
+  std::signal(SIGTERM, shutdownHandler);
+  std::signal(SIGINT, shutdownHandler);
+
+  // Drain timeout: how long to wait for active connections before exit
+  const char* drainEnv = std::getenv("BEEPBOX_DRAIN_TIMEOUT_S");
+  int drainTimeout = drainEnv ? std::atoi(drainEnv) : 8;
+  if (drainTimeout < 1) drainTimeout = 8;
+  app().setIdleConnectionTimeout(drainTimeout);
+
+  std::cout << "beepbox-server starting on 0.0.0.0:8080 (drain timeout: "
+            << drainTimeout << "s)\n";
   app().addListener("0.0.0.0", 8080);
   app().setThreadNum(4);
   app().run();
 
+  std::cout << "{\"severity\":\"INFO\",\"message\":\"Shutdown complete\"}\n";
   return 0;
 }

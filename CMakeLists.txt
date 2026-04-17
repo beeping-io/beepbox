@@ -246,6 +246,13 @@ if(BUILD_TESTING)
   add_test(NAME CLI_DryRun
            COMMAND BeepBox -k 00001 -o ${CMAKE_BINARY_DIR}/test_dry.wav -n)
 
+  # Graceful shutdown test
+  if(BEEPBOX_BUILD_SERVER)
+    add_test(NAME Server_GracefulShutdown
+             COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/shutdown_test.sh)
+    set_tests_properties(Server_GracefulShutdown PROPERTIES TIMEOUT 20)
+  endif()
+
   add_test(NAME CLI_TooShortFails
            COMMAND BeepBox -k 00001 -o ${CMAKE_BINARY_DIR}/test_fail.wav -d 1.0)
   set_tests_properties(CLI_TooShortFails PROPERTIES WILL_FAIL TRUE)
