@@ -53,3 +53,6 @@ include/configure.h
 beeps.cache/
 logs/
 build/
+
+# Generated OpenAPI clients (artifacts only, not committed)
+clients/
