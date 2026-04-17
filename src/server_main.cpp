@@ -6,8 +6,8 @@
 #include "beepbox/WavReader.h"
 #include "beepbox/ApiKeyAuth.h"
 #include "beepbox/RateLimiter.h"
+#include "beepbox/Metrics.h"
 
-#include <atomic>
 #include <chrono>
 #include <iostream>
 #include <string>
@@ -26,14 +26,8 @@
 
 using namespace drogon;
 
-// --- Metrics counters (atomic, thread-safe) ---
-static std::atomic<uint64_t> g_requests_total{0};
-static std::atomic<uint64_t> g_encode_total{0};
-static std::atomic<uint64_t> g_encode_errors{0};
-static std::atomic<uint64_t> g_decode_total{0};
-static std::atomic<uint64_t> g_decode_errors{0};
-static std::atomic<uint64_t> g_decode_not_found{0};
-static auto g_start_time = std::chrono::steady_clock::now();
+// --- Metrics collector (initialized in main) ---
+static beepbox::MetricsCollector* g_metrics = nullptr;
 
 // Shared auth state (initialized in main)
 static beepbox::EnvKeyStore* g_keyStore = nullptr;
@@ -99,6 +93,10 @@ int main() {
   g_keyStore = &keyStore;
   g_keyCache = &keyCache;
   g_authEnabled = !keyStore.empty();
+
+  // --- Metrics setup ---
+  static beepbox::MetricsCollector metricsCollector;
+  g_metrics = &metricsCollector;
 
   if (g_authEnabled) {
     std::cout << "API key authentication enabled\n";
@@ -169,19 +167,25 @@ int main() {
       "/v1/encode",
       [](const HttpRequestPtr& req,
          std::function<void(const HttpResponsePtr&)>&& callback) {
-        g_requests_total++;
-        g_encode_total++;
+        auto t0 = std::chrono::steady_clock::now();
         if (!requireAuth(req, callback)) return;
         std::string authHdr = req->getHeader("Authorization");
         std::string apiKey = authHdr.size() > 7 ? authHdr.substr(7) : "anonymous";
         if (!checkRateLimit(apiKey, callback)) return;
+
+        auto recordMetrics = [&](int status) {
+          double dur = std::chrono::duration<double>(
+              std::chrono::steady_clock::now() - t0).count();
+          if (g_metrics) g_metrics->record(apiKey, "/v1/encode", status, dur);
+        };
+
         auto jsonPtr = req->getJsonObject();
         if (!jsonPtr) {
-          g_encode_errors++;
           auto resp = HttpResponse::newHttpJsonResponse(
               Json::Value(Json::objectValue));
           (*resp->getJsonObject())["error"] = "Invalid JSON body";
           resp->setStatusCode(k400BadRequest);
+          recordMetrics(400);
           callback(resp);
           return;
         }
@@ -193,12 +197,12 @@ int main() {
 
         std::string modeStr = json.get("mode", "inaudible").asString();
         if (!beepbox::parseMode(modeStr, p.mode)) {
-          g_encode_errors++;
           auto resp = HttpResponse::newHttpJsonResponse(
               Json::Value(Json::objectValue));
           (*resp->getJsonObject())["error"] =
               "Invalid mode. Use: audible, inaudible, all";
           resp->setStatusCode(k400BadRequest);
+          recordMetrics(400);
           callback(resp);
           return;
         }
@@ -212,13 +216,13 @@ int main() {
         // Validate
         auto vr = beepbox::validate(p);
         if (!vr.ok) {
-          g_encode_errors++;
           auto resp = HttpResponse::newHttpJsonResponse(
               Json::Value(Json::objectValue));
           Json::Value errors(Json::arrayValue);
           for (const auto& e : vr.errors) errors.append(e);
           (*resp->getJsonObject())["errors"] = errors;
           resp->setStatusCode(k400BadRequest);
+          recordMetrics(400);
           callback(resp);
           return;
         }
@@ -226,11 +230,11 @@ int main() {
         // Generate beeps
         auto result = beepbox::generateBeeps(p);
         if (result.beepsGenerated <= 0 || result.samples.empty()) {
-          g_encode_errors++;
           auto resp = HttpResponse::newHttpJsonResponse(
               Json::Value(Json::objectValue));
           (*resp->getJsonObject())["error"] = "Failed to generate beeps";
           resp->setStatusCode(k500InternalServerError);
+          recordMetrics(500);
           callback(resp);
           return;
         }
@@ -247,6 +251,7 @@ int main() {
         resp->addHeader("X-Beeps-Generated",
                         std::to_string(result.beepsGenerated));
         resp->setStatusCode(k200OK);
+        recordMetrics(200);
         callback(resp);
       },
       {Post});
@@ -256,19 +261,25 @@ int main() {
       "/v1/decode",
       [](const HttpRequestPtr& req,
          std::function<void(const HttpResponsePtr&)>&& callback) {
-        g_requests_total++;
-        g_decode_total++;
+        auto t0 = std::chrono::steady_clock::now();
         if (!requireAuth(req, callback)) return;
         std::string authHdrDec = req->getHeader("Authorization");
         std::string apiKeyDec = authHdrDec.size() > 7 ? authHdrDec.substr(7) : "anonymous";
         if (!checkRateLimit(apiKeyDec, callback)) return;
+
+        auto recordMetrics = [&](int status) {
+          double dur = std::chrono::duration<double>(
+              std::chrono::steady_clock::now() - t0).count();
+          if (g_metrics) g_metrics->record(apiKeyDec, "/v1/decode", status, dur);
+        };
+
         const auto& body = req->body();
         if (body.empty()) {
-          g_decode_errors++;
           auto resp = HttpResponse::newHttpJsonResponse(
               Json::Value(Json::objectValue));
           (*resp->getJsonObject())["error"] = "Empty body. Send WAV audio data.";
           resp->setStatusCode(k400BadRequest);
+          recordMetrics(400);
           callback(resp);
           return;
         }
@@ -276,11 +287,11 @@ int main() {
         // Parse WAV
         auto wav = beepbox::fromWav(body.data(), body.size());
         if (!wav.valid) {
-          g_decode_errors++;
           auto resp = HttpResponse::newHttpJsonResponse(
               Json::Value(Json::objectValue));
           (*resp->getJsonObject())["error"] = "Invalid WAV: " + wav.error;
           resp->setStatusCode(k400BadRequest);
+          recordMetrics(400);
           callback(resp);
           return;
         }
@@ -321,16 +332,17 @@ int main() {
             json["confidence"] = BEEPING_GetConfidence(core);
             json["mode"] = BEEPING_GetDecodedMode(core);
             resp->setStatusCode(k200OK);
+            recordMetrics(200);
           } else {
-            g_decode_errors++;
             json["error"] = "Decode returned invalid data";
             resp->setStatusCode(k422UnprocessableEntity);
+            recordMetrics(422);
           }
         } else {
-          g_decode_not_found++;
           json["error"] = "No beeping data found in audio";
           json["hint"] = "Ensure the WAV contains encoded beeps (audible or inaudible)";
           resp->setStatusCode(k404NotFound);
+          recordMetrics(404);
         }
 
         BEEPING_Destroy(core);
@@ -343,42 +355,8 @@ int main() {
       "/metrics",
       [](const HttpRequestPtr&,
          std::function<void(const HttpResponsePtr&)>&& callback) {
-        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
-            std::chrono::steady_clock::now() - g_start_time);
-
-        std::string body;
-        body.reserve(1024);
-
-        body += "# HELP beepbox_uptime_seconds Time since server start.\n";
-        body += "# TYPE beepbox_uptime_seconds gauge\n";
-        body += "beepbox_uptime_seconds " + std::to_string(elapsed.count()) + "\n\n";
-
-        body += "# HELP beepbox_requests_total Total HTTP requests.\n";
-        body += "# TYPE beepbox_requests_total counter\n";
-        body += "beepbox_requests_total " + std::to_string(g_requests_total.load()) + "\n\n";
-
-        body += "# HELP beepbox_encode_total Total encode requests.\n";
-        body += "# TYPE beepbox_encode_total counter\n";
-        body += "beepbox_encode_total " + std::to_string(g_encode_total.load()) + "\n\n";
-
-        body += "# HELP beepbox_encode_errors_total Total encode errors.\n";
-        body += "# TYPE beepbox_encode_errors_total counter\n";
-        body += "beepbox_encode_errors_total " + std::to_string(g_encode_errors.load()) + "\n\n";
-
-        body += "# HELP beepbox_decode_total Total decode requests.\n";
-        body += "# TYPE beepbox_decode_total counter\n";
-        body += "beepbox_decode_total " + std::to_string(g_decode_total.load()) + "\n\n";
-
-        body += "# HELP beepbox_decode_errors_total Total decode errors.\n";
-        body += "# TYPE beepbox_decode_errors_total counter\n";
-        body += "beepbox_decode_errors_total " + std::to_string(g_decode_errors.load()) + "\n\n";
-
-        body += "# HELP beepbox_decode_not_found_total Decode requests with no payload found.\n";
-        body += "# TYPE beepbox_decode_not_found_total counter\n";
-        body += "beepbox_decode_not_found_total " + std::to_string(g_decode_not_found.load()) + "\n";
-
         auto resp = HttpResponse::newHttpResponse();
-        resp->setBody(std::move(body));
+        resp->setBody(g_metrics ? g_metrics->serialize() : "");
         resp->setContentTypeCode(CT_CUSTOM);
         resp->addHeader("Content-Type",
                         "text/plain; version=0.0.4; charset=utf-8");
