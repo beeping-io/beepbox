@@ -108,6 +108,19 @@ target_link_libraries(BeepBox PRIVATE
 option(BEEPBOX_BUILD_SERVER "Build the beepbox-server HTTP executable" ON)
 
 if(BEEPBOX_BUILD_SERVER)
+  # --- Build metadata (git SHA + timestamp) ---
+  execute_process(
+    COMMAND git rev-parse --short HEAD
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE BEEPBOX_GIT_SHA
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+  )
+  if(NOT BEEPBOX_GIT_SHA)
+    set(BEEPBOX_GIT_SHA "unknown")
+  endif()
+  string(TIMESTAMP BEEPBOX_BUILD_TIME "%Y-%m-%dT%H:%M:%SZ" UTC)
+
   # Drogon minimal: no ORM, no examples, no tests
   set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
   set(BUILD_CTL OFF CACHE BOOL "" FORCE)
@@ -129,6 +142,12 @@ if(BEEPBOX_BUILD_SERVER)
 
   target_include_directories(beepbox-server PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+  )
+
+  target_compile_definitions(beepbox-server PRIVATE
+    BEEPBOX_GIT_SHA="${BEEPBOX_GIT_SHA}"
+    BEEPBOX_BUILD_TIME="${BEEPBOX_BUILD_TIME}"
+    BEEPBOX_VERSION="${PROJECT_VERSION}"
   )
 
   target_link_libraries(beepbox-server PRIVATE
@@ -186,6 +205,19 @@ if(BUILD_TESTING)
   target_include_directories(BeepBoxTests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
   )
+
+  # --- Server endpoint integration tests (require beepbox-server running) ---
+  if(BEEPBOX_BUILD_SERVER)
+    add_executable(ServerEndpointTests
+      tests/ServerEndpointTests.cpp
+    )
+    target_link_libraries(ServerEndpointTests PRIVATE Catch2::Catch2WithMain)
+    target_include_directories(ServerEndpointTests PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+    # These tests require a running server — tagged [server] for selective runs
+    catch_discover_tests(ServerEndpointTests)
+  endif()
 
   if(NOT WIN32)
     target_link_libraries(BeepBoxTests PRIVATE pthread)

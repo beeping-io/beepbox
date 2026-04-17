@@ -90,7 +90,33 @@ paths:
               example:
                 server: beepbox-server
                 version: 0.0.0
+                commit: a1b2c3d
+                built: "2026-04-17T10:00:00Z"
                 core: 2.0.0
+
+  /metrics:
+    get:
+      operationId: getMetrics
+      summary: Prometheus metrics
+      description: |
+        Returns server metrics in Prometheus exposition format.
+        Includes request counters, error counters, and uptime.
+      tags: [operations]
+      responses:
+        "200":
+          description: Metrics in Prometheus text format
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |
+                # HELP beepbox_uptime_seconds Time since server start.
+                # TYPE beepbox_uptime_seconds gauge
+                beepbox_uptime_seconds 3600
+
+                # HELP beepbox_requests_total Total HTTP requests.
+                # TYPE beepbox_requests_total counter
+                beepbox_requests_total 142
 
   /v1/encode:
     post:
@@ -310,7 +336,7 @@ components:
 
     VersionResponse:
       type: object
-      required: [server, version, core]
+      required: [server, version, commit, built, core]
       properties:
         server:
           type: string
@@ -320,6 +346,14 @@ components:
           type: string
           description: Server version (SemVer)
           examples: ["0.0.0"]
+        commit:
+          type: string
+          description: Git commit SHA (short)
+          examples: ["a1b2c3d"]
+        built:
+          type: string
+          description: Build timestamp (ISO 8601 UTC)
+          examples: ["2026-04-17T10:00:00Z"]
         core:
           type: string
           description: beeping-core library version

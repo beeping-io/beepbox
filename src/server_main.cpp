@@ -5,12 +5,33 @@
 #include "beepbox/WavWriter.h"
 #include "beepbox/WavReader.h"
 
+#include <atomic>
+#include <chrono>
 #include <iostream>
 #include <string>
 #include <algorithm>
 #include <vector>
 
+#ifndef BEEPBOX_VERSION
+#define BEEPBOX_VERSION "0.0.0"
+#endif
+#ifndef BEEPBOX_GIT_SHA
+#define BEEPBOX_GIT_SHA "unknown"
+#endif
+#ifndef BEEPBOX_BUILD_TIME
+#define BEEPBOX_BUILD_TIME "unknown"
+#endif
+
 using namespace drogon;
+
+// --- Metrics counters (atomic, thread-safe) ---
+static std::atomic<uint64_t> g_requests_total{0};
+static std::atomic<uint64_t> g_encode_total{0};
+static std::atomic<uint64_t> g_encode_errors{0};
+static std::atomic<uint64_t> g_decode_total{0};
+static std::atomic<uint64_t> g_decode_errors{0};
+static std::atomic<uint64_t> g_decode_not_found{0};
+static auto g_start_time = std::chrono::steady_clock::now();
 
 int main() {
   // --- /healthz — liveness probe ---
@@ -52,7 +73,9 @@ int main() {
         auto resp = HttpResponse::newHttpJsonResponse(
             Json::Value(Json::objectValue));
         (*resp->getJsonObject())["server"] = "beepbox-server";
-        (*resp->getJsonObject())["version"] = "0.0.0";
+        (*resp->getJsonObject())["version"] = BEEPBOX_VERSION;
+        (*resp->getJsonObject())["commit"] = BEEPBOX_GIT_SHA;
+        (*resp->getJsonObject())["built"] = BEEPBOX_BUILD_TIME;
         (*resp->getJsonObject())["core"] = BEEPING_GetVersion();
         resp->setStatusCode(k200OK);
         callback(resp);
@@ -64,8 +87,11 @@ int main() {
       "/v1/encode",
       [](const HttpRequestPtr& req,
          std::function<void(const HttpResponsePtr&)>&& callback) {
+        g_requests_total++;
+        g_encode_total++;
         auto jsonPtr = req->getJsonObject();
         if (!jsonPtr) {
+          g_encode_errors++;
           auto resp = HttpResponse::newHttpJsonResponse(
               Json::Value(Json::objectValue));
           (*resp->getJsonObject())["error"] = "Invalid JSON body";
@@ -81,6 +107,7 @@ int main() {
 
         std::string modeStr = json.get("mode", "inaudible").asString();
         if (!beepbox::parseMode(modeStr, p.mode)) {
+          g_encode_errors++;
           auto resp = HttpResponse::newHttpJsonResponse(
               Json::Value(Json::objectValue));
           (*resp->getJsonObject())["error"] =
@@ -99,6 +126,7 @@ int main() {
         // Validate
         auto vr = beepbox::validate(p);
         if (!vr.ok) {
+          g_encode_errors++;
           auto resp = HttpResponse::newHttpJsonResponse(
               Json::Value(Json::objectValue));
           Json::Value errors(Json::arrayValue);
@@ -112,6 +140,7 @@ int main() {
         // Generate beeps
         auto result = beepbox::generateBeeps(p);
         if (result.beepsGenerated <= 0 || result.samples.empty()) {
+          g_encode_errors++;
           auto resp = HttpResponse::newHttpJsonResponse(
               Json::Value(Json::objectValue));
           (*resp->getJsonObject())["error"] = "Failed to generate beeps";
@@ -141,8 +170,11 @@ int main() {
       "/v1/decode",
       [](const HttpRequestPtr& req,
          std::function<void(const HttpResponsePtr&)>&& callback) {
+        g_requests_total++;
+        g_decode_total++;
         const auto& body = req->body();
         if (body.empty()) {
+          g_decode_errors++;
           auto resp = HttpResponse::newHttpJsonResponse(
               Json::Value(Json::objectValue));
           (*resp->getJsonObject())["error"] = "Empty body. Send WAV audio data.";
@@ -154,6 +186,7 @@ int main() {
         // Parse WAV
         auto wav = beepbox::fromWav(body.data(), body.size());
         if (!wav.valid) {
+          g_decode_errors++;
           auto resp = HttpResponse::newHttpJsonResponse(
               Json::Value(Json::objectValue));
           (*resp->getJsonObject())["error"] = "Invalid WAV: " + wav.error;
@@ -199,10 +232,12 @@ int main() {
             json["mode"] = BEEPING_GetDecodedMode(core);
             resp->setStatusCode(k200OK);
           } else {
+            g_decode_errors++;
             json["error"] = "Decode returned invalid data";
             resp->setStatusCode(k422UnprocessableEntity);
           }
         } else {
+          g_decode_not_found++;
           json["error"] = "No beeping data found in audio";
           json["hint"] = "Ensure the WAV contains encoded beeps (audible or inaudible)";
           resp->setStatusCode(k404NotFound);
@@ -212,6 +247,55 @@ int main() {
         callback(resp);
       },
       {Post});
+
+  // --- GET /metrics — Prometheus exposition format ---
+  app().registerHandler(
+      "/metrics",
+      [](const HttpRequestPtr&,
+         std::function<void(const HttpResponsePtr&)>&& callback) {
+        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
+            std::chrono::steady_clock::now() - g_start_time);
+
+        std::string body;
+        body.reserve(1024);
+
+        body += "# HELP beepbox_uptime_seconds Time since server start.\n";
+        body += "# TYPE beepbox_uptime_seconds gauge\n";
+        body += "beepbox_uptime_seconds " + std::to_string(elapsed.count()) + "\n\n";
+
+        body += "# HELP beepbox_requests_total Total HTTP requests.\n";
+        body += "# TYPE beepbox_requests_total counter\n";
+        body += "beepbox_requests_total " + std::to_string(g_requests_total.load()) + "\n\n";
+
+        body += "# HELP beepbox_encode_total Total encode requests.\n";
+        body += "# TYPE beepbox_encode_total counter\n";
+        body += "beepbox_encode_total " + std::to_string(g_encode_total.load()) + "\n\n";
+
+        body += "# HELP beepbox_encode_errors_total Total encode errors.\n";
+        body += "# TYPE beepbox_encode_errors_total counter\n";
+        body += "beepbox_encode_errors_total " + std::to_string(g_encode_errors.load()) + "\n\n";
+
+        body += "# HELP beepbox_decode_total Total decode requests.\n";
+        body += "# TYPE beepbox_decode_total counter\n";
+        body += "beepbox_decode_total " + std::to_string(g_decode_total.load()) + "\n\n";
+
+        body += "# HELP beepbox_decode_errors_total Total decode errors.\n";
+        body += "# TYPE beepbox_decode_errors_total counter\n";
+        body += "beepbox_decode_errors_total " + std::to_string(g_decode_errors.load()) + "\n\n";
+
+        body += "# HELP beepbox_decode_not_found_total Decode requests with no payload found.\n";
+        body += "# TYPE beepbox_decode_not_found_total counter\n";
+        body += "beepbox_decode_not_found_total " + std::to_string(g_decode_not_found.load()) + "\n";
+
+        auto resp = HttpResponse::newHttpResponse();
+        resp->setBody(std::move(body));
+        resp->setContentTypeCode(CT_CUSTOM);
+        resp->addHeader("Content-Type",
+                        "text/plain; version=0.0.4; charset=utf-8");
+        resp->setStatusCode(k200OK);
+        callback(resp);
+      },
+      {Get});
 
   std::cout << "beepbox-server starting on 0.0.0.0:8080\n";
   app().addListener("0.0.0.0", 8080);
