@@ -4,6 +4,7 @@
 #include "beepbox/Params.h"
 #include "beepbox/WavWriter.h"
 #include "beepbox/WavReader.h"
+#include "beepbox/ApiKeyAuth.h"
 
 #include <atomic>
 #include <chrono>
@@ -33,7 +34,45 @@ static std::atomic<uint64_t> g_decode_errors{0};
 static std::atomic<uint64_t> g_decode_not_found{0};
 static auto g_start_time = std::chrono::steady_clock::now();
 
+// Shared auth state (initialized in main)
+static beepbox::EnvKeyStore* g_keyStore = nullptr;
+static beepbox::KeyCache* g_keyCache = nullptr;
+static bool g_authEnabled = false;
+
+// Returns true if auth passes, false if response was sent with error
+static bool requireAuth(
+    const drogon::HttpRequestPtr& req,
+    const std::function<void(const drogon::HttpResponsePtr&)>& callback) {
+  if (!g_authEnabled) return true;
+
+  std::string authHeader = req->getHeader("Authorization");
+  auto check = beepbox::checkAuth(authHeader, *g_keyStore, *g_keyCache);
+
+  if (check.result == beepbox::AuthResult::Ok) return true;
+
+  auto resp = HttpResponse::newHttpResponse();
+  resp->setContentTypeCode(CT_APPLICATION_JSON);
+  resp->setBody(beepbox::authErrorBody(check.result));
+  resp->setStatusCode(
+      static_cast<HttpStatusCode>(beepbox::authStatusCode(check.result)));
+  callback(resp);
+  return false;
+}
+
 int main() {
+  // --- Auth setup ---
+  static beepbox::EnvKeyStore keyStore;
+  static beepbox::KeyCache keyCache;
+  g_keyStore = &keyStore;
+  g_keyCache = &keyCache;
+  g_authEnabled = !keyStore.empty();
+
+  if (g_authEnabled) {
+    std::cout << "API key authentication enabled\n";
+  } else {
+    std::cout << "WARNING: BEEPBOX_API_KEYS not set — auth disabled (dev mode)\n";
+  }
+
   // --- /healthz — liveness probe ---
   app().registerHandler(
       "/healthz",
@@ -89,6 +128,7 @@ int main() {
          std::function<void(const HttpResponsePtr&)>&& callback) {
         g_requests_total++;
         g_encode_total++;
+        if (!requireAuth(req, callback)) return;
         auto jsonPtr = req->getJsonObject();
         if (!jsonPtr) {
           g_encode_errors++;
@@ -172,6 +212,7 @@ int main() {
          std::function<void(const HttpResponsePtr&)>&& callback) {
         g_requests_total++;
         g_decode_total++;
+        if (!requireAuth(req, callback)) return;
         const auto& body = req->body();
         if (body.empty()) {
           g_decode_errors++;

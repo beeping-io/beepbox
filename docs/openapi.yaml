@@ -36,6 +36,7 @@ paths:
     get:
       operationId: getHealth
       summary: Liveness probe
+      security: []
       description: Returns 200 if the server process is alive.
       tags: [operations]
       responses:
@@ -52,6 +53,7 @@ paths:
     get:
       operationId: getReadiness
       summary: Readiness probe
+      security: []
       description: |
         Returns 200 if the server can instantiate a beeping-core context.
         Returns 503 if the core library is unavailable.
@@ -78,6 +80,7 @@ paths:
     get:
       operationId: getVersion
       summary: Server version information
+      security: []
       description: Returns the server name, version, and beeping-core version.
       tags: [operations]
       responses:
@@ -98,6 +101,7 @@ paths:
     get:
       operationId: getMetrics
       summary: Prometheus metrics
+      security: []
       description: |
         Returns server metrics in Prometheus exposition format.
         Includes request counters, error counters, and uptime.
@@ -247,7 +251,20 @@ paths:
               example:
                 error: "Decode returned invalid data"
 
+security:
+  - ApiKeyAuth: []
+
 components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      description: |
+        API key authentication. Keys are prefixed with `bk_`.
+        Pass as: `Authorization: Bearer bk_your_key_here`.
+        Operational endpoints (/healthz, /readyz, /version, /metrics)
+        do not require authentication.
+
   schemas:
     EncodeRequest:
       type: object
