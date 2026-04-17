@@ -5,6 +5,7 @@
 #include "beepbox/WavWriter.h"
 #include "beepbox/WavReader.h"
 #include "beepbox/ApiKeyAuth.h"
+#include "beepbox/RateLimiter.h"
 
 #include <atomic>
 #include <chrono>
@@ -39,6 +40,9 @@ static beepbox::EnvKeyStore* g_keyStore = nullptr;
 static beepbox::KeyCache* g_keyCache = nullptr;
 static bool g_authEnabled = false;
 
+// Shared rate limiter (initialized in main)
+static beepbox::RateLimiter* g_rateLimiter = nullptr;
+
 // Returns true if auth passes, false if response was sent with error
 static bool requireAuth(
     const drogon::HttpRequestPtr& req,
@@ -59,6 +63,35 @@ static bool requireAuth(
   return false;
 }
 
+// Add rate limit headers to a response
+static void addRateLimitHeaders(const drogon::HttpResponsePtr& resp,
+                                 const beepbox::RateLimitResult& rl) {
+  if (!g_rateLimiter || !g_rateLimiter->enabled()) return;
+  resp->addHeader("X-RateLimit-Limit", std::to_string(rl.limit));
+  resp->addHeader("X-RateLimit-Remaining", std::to_string(rl.remaining));
+  resp->addHeader("X-RateLimit-Reset", std::to_string(rl.resetAt));
+}
+
+// Returns true if rate limit passes, false if 429 was sent
+static bool checkRateLimit(
+    const std::string& key,
+    const std::function<void(const drogon::HttpResponsePtr&)>& callback) {
+  if (!g_rateLimiter || !g_rateLimiter->enabled()) return true;
+
+  auto rl = g_rateLimiter->check(key);
+  if (rl.allowed) return true;
+
+  auto resp = HttpResponse::newHttpResponse();
+  resp->setContentTypeCode(CT_APPLICATION_JSON);
+  resp->setBody(R"({"error":"Rate limit exceeded","hint":"Retry after )" +
+                std::to_string(rl.retryAfter) + R"( seconds"})");
+  resp->setStatusCode(k429TooManyRequests);
+  resp->addHeader("Retry-After", std::to_string(rl.retryAfter));
+  addRateLimitHeaders(resp, rl);
+  callback(resp);
+  return false;
+}
+
 int main() {
   // --- Auth setup ---
   static beepbox::EnvKeyStore keyStore;
@@ -71,6 +104,16 @@ int main() {
     std::cout << "API key authentication enabled\n";
   } else {
     std::cout << "WARNING: BEEPBOX_API_KEYS not set — auth disabled (dev mode)\n";
+  }
+
+  // --- Rate limiter setup ---
+  static beepbox::RateLimiter rateLimiter = beepbox::RateLimiter::fromEnv();
+  g_rateLimiter = &rateLimiter;
+
+  if (g_rateLimiter->enabled()) {
+    std::cout << "Rate limiting enabled\n";
+  } else {
+    std::cout << "WARNING: BEEPBOX_RATE_LIMIT_RPM not set — rate limiting disabled\n";
   }
 
   // --- /healthz — liveness probe ---
@@ -129,6 +172,9 @@ int main() {
         g_requests_total++;
         g_encode_total++;
         if (!requireAuth(req, callback)) return;
+        std::string authHdr = req->getHeader("Authorization");
+        std::string apiKey = authHdr.size() > 7 ? authHdr.substr(7) : "anonymous";
+        if (!checkRateLimit(apiKey, callback)) return;
         auto jsonPtr = req->getJsonObject();
         if (!jsonPtr) {
           g_encode_errors++;
@@ -213,6 +259,9 @@ int main() {
         g_requests_total++;
         g_decode_total++;
         if (!requireAuth(req, callback)) return;
+        std::string authHdrDec = req->getHeader("Authorization");
+        std::string apiKeyDec = authHdrDec.size() > 7 ? authHdrDec.substr(7) : "anonymous";
+        if (!checkRateLimit(apiKeyDec, callback)) return;
         const auto& body = req->body();
         if (body.empty()) {
           g_decode_errors++;

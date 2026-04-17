@@ -182,6 +182,33 @@ paths:
                   summary: Invalid mode string
                   value:
                     error: "Invalid mode. Use: audible, inaudible, all"
+        "429":
+          description: Rate limit exceeded
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying
+              schema:
+                type: integer
+            X-RateLimit-Limit:
+              description: Max requests per window
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              description: Remaining requests in current window
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              description: Unix timestamp when the rate limit resets
+              schema:
+                type: integer
+                format: int64
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Rate limit exceeded"
+                hint: "Retry after 20 seconds"
         "500":
           description: Internal generation failure
           content:
