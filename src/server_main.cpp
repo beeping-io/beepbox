@@ -7,6 +7,7 @@
 #include "beepbox/ApiKeyAuth.h"
 #include "beepbox/RateLimiter.h"
 #include "beepbox/Metrics.h"
+#include "beepbox/Tracing.h"
 
 #include <chrono>
 #include <iostream>
@@ -173,10 +174,24 @@ int main() {
         std::string apiKey = authHdr.size() > 7 ? authHdr.substr(7) : "anonymous";
         if (!checkRateLimit(apiKey, callback)) return;
 
+        auto [span, traceResp] = beepbox::startRequestTrace(
+            "encode", req->getHeader("traceparent"));
+        span.setAttribute("http.method", "POST");
+        span.setAttribute("http.url", "/v1/encode");
+        span.setAttribute("beepbox.key_hash", beepbox::hashKey(apiKey));
+
         auto recordMetrics = [&](int status) {
           double dur = std::chrono::duration<double>(
               std::chrono::steady_clock::now() - t0).count();
           if (g_metrics) g_metrics->record(apiKey, "/v1/encode", status, dur);
+        };
+
+        auto addTrace = [&](const drogon::HttpResponsePtr& resp, int status) {
+          resp->addHeader("traceresponse", traceResp);
+          resp->addHeader("X-Trace-Id", span.traceId());
+          span.setAttribute("http.status_code", status);
+          span.end(status, status >= 400 ? "error" : "");
+          std::cout << span.toJson() << "\n";
         };
 
         auto jsonPtr = req->getJsonObject();
@@ -185,7 +200,7 @@ int main() {
               Json::Value(Json::objectValue));
           (*resp->getJsonObject())["error"] = "Invalid JSON body";
           resp->setStatusCode(k400BadRequest);
-          recordMetrics(400);
+          recordMetrics(400); addTrace(resp, 400);
           callback(resp);
           return;
         }
@@ -202,7 +217,7 @@ int main() {
           (*resp->getJsonObject())["error"] =
               "Invalid mode. Use: audible, inaudible, all";
           resp->setStatusCode(k400BadRequest);
-          recordMetrics(400);
+          recordMetrics(400); addTrace(resp, 400);
           callback(resp);
           return;
         }
@@ -222,7 +237,7 @@ int main() {
           for (const auto& e : vr.errors) errors.append(e);
           (*resp->getJsonObject())["errors"] = errors;
           resp->setStatusCode(k400BadRequest);
-          recordMetrics(400);
+          recordMetrics(400); addTrace(resp, 400);
           callback(resp);
           return;
         }
@@ -234,7 +249,7 @@ int main() {
               Json::Value(Json::objectValue));
           (*resp->getJsonObject())["error"] = "Failed to generate beeps";
           resp->setStatusCode(k500InternalServerError);
-          recordMetrics(500);
+          recordMetrics(500); addTrace(resp, 500);
           callback(resp);
           return;
         }
@@ -251,7 +266,7 @@ int main() {
         resp->addHeader("X-Beeps-Generated",
                         std::to_string(result.beepsGenerated));
         resp->setStatusCode(k200OK);
-        recordMetrics(200);
+        recordMetrics(200); addTrace(resp, 200);
         callback(resp);
       },
       {Post});
@@ -267,10 +282,24 @@ int main() {
         std::string apiKeyDec = authHdrDec.size() > 7 ? authHdrDec.substr(7) : "anonymous";
         if (!checkRateLimit(apiKeyDec, callback)) return;
 
+        auto [spanDec, traceRespDec] = beepbox::startRequestTrace(
+            "decode", req->getHeader("traceparent"));
+        spanDec.setAttribute("http.method", "POST");
+        spanDec.setAttribute("http.url", "/v1/decode");
+        spanDec.setAttribute("beepbox.key_hash", beepbox::hashKey(apiKeyDec));
+
         auto recordMetrics = [&](int status) {
           double dur = std::chrono::duration<double>(
               std::chrono::steady_clock::now() - t0).count();
           if (g_metrics) g_metrics->record(apiKeyDec, "/v1/decode", status, dur);
+        };
+
+        auto addTraceDec = [&](const drogon::HttpResponsePtr& resp, int status) {
+          resp->addHeader("traceresponse", traceRespDec);
+          resp->addHeader("X-Trace-Id", spanDec.traceId());
+          spanDec.setAttribute("http.status_code", status);
+          spanDec.end(status, status >= 400 ? "error" : "");
+          std::cout << spanDec.toJson() << "\n";
         };
 
         const auto& body = req->body();
@@ -279,7 +308,7 @@ int main() {
               Json::Value(Json::objectValue));
           (*resp->getJsonObject())["error"] = "Empty body. Send WAV audio data.";
           resp->setStatusCode(k400BadRequest);
-          recordMetrics(400);
+          recordMetrics(400); addTraceDec(resp, 400);
           callback(resp);
           return;
         }
@@ -291,7 +320,7 @@ int main() {
               Json::Value(Json::objectValue));
           (*resp->getJsonObject())["error"] = "Invalid WAV: " + wav.error;
           resp->setStatusCode(k400BadRequest);
-          recordMetrics(400);
+          recordMetrics(400); addTraceDec(resp, 400);
           callback(resp);
           return;
         }
@@ -332,17 +361,17 @@ int main() {
             json["confidence"] = BEEPING_GetConfidence(core);
             json["mode"] = BEEPING_GetDecodedMode(core);
             resp->setStatusCode(k200OK);
-            recordMetrics(200);
+            recordMetrics(200); addTraceDec(resp, 200);
           } else {
             json["error"] = "Decode returned invalid data";
             resp->setStatusCode(k422UnprocessableEntity);
-            recordMetrics(422);
+            recordMetrics(422); addTraceDec(resp, 422);
           }
         } else {
           json["error"] = "No beeping data found in audio";
           json["hint"] = "Ensure the WAV contains encoded beeps (audible or inaudible)";
           resp->setStatusCode(k404NotFound);
-          recordMetrics(404);
+          recordMetrics(404); addTraceDec(resp, 404);
         }
 
         BEEPING_Destroy(core);

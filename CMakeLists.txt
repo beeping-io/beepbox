@@ -141,6 +141,7 @@ if(BEEPBOX_BUILD_SERVER)
     src/ApiKeyAuth.cpp
     src/RateLimiter.cpp
     src/Metrics.cpp
+    src/Tracing.cpp
   )
 
   target_include_directories(beepbox-server PRIVATE
@@ -205,9 +206,11 @@ if(BUILD_TESTING)
     tests/ApiKeyAuthTests.cpp
     tests/RateLimiterTests.cpp
     tests/MetricsTests.cpp
+    tests/TracingTests.cpp
     src/ApiKeyAuth.cpp
     src/RateLimiter.cpp
     src/Metrics.cpp
+    src/Tracing.cpp
   )
 
   target_link_libraries(BeepBoxTests PRIVATE beepbox_lib Catch2::Catch2WithMain)
