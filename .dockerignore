@@ -1,0 +1,14 @@
+build/
+.git/
+.github/
+.cache/
+.vscode/
+*.o
+*.a
+*.so
+*.dylib
+tests/
+docs/
+logs/
+uploads/
+beeps.cache/

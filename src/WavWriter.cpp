@@ -1,5 +1,6 @@
 #include "beepbox/WavWriter.h"
 #include <algorithm>
+#include <cstdint>
 #include <cstring>
 #include <cmath>
 

@@ -1,4 +1,5 @@
 #include "beepbox/WavReader.h"
+#include <cstdint>
 #include <cstring>
 
 namespace beepbox {
