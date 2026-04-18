@@ -1,0 +1,427 @@
+openapi: 3.1.0
+info:
+  title: Beepbox API
+  version: 0.0.0
+  description: |
+    HTTP API for encoding and decoding ultrasonic/audible data payloads
+    in audio using the Beeping protocol.
+
+    Beepbox wraps [beeping-core](https://github.com/beeping-io/beeping-core)
+    in a stateless HTTP server. Send a JSON payload to encode data into a WAV
+    file, or upload a WAV file to decode the embedded payload.
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+  contact:
+    name: Beeping
+    url: https://beeping.io
+    email: dev@beeping.io
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+  - url: https://api.beeping.io
+    description: Production (Cloud Run)
+
+tags:
+  - name: encoding
+    description: Encode data payloads into audio
+  - name: decoding
+    description: Decode data payloads from audio
+  - name: operations
+    description: Health checks and server metadata
+
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      summary: Liveness probe
+      security: []
+      description: Returns 200 if the server process is alive.
+      tags: [operations]
+      responses:
+        "200":
+          description: Server is alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: ok
+
+  /readyz:
+    get:
+      operationId: getReadiness
+      summary: Readiness probe
+      security: []
+      description: |
+        Returns 200 if the server can instantiate a beeping-core context.
+        Returns 503 if the core library is unavailable.
+      tags: [operations]
+      responses:
+        "200":
+          description: Server is ready to accept requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+              example:
+                ready: true
+        "503":
+          description: Server is not ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+              example:
+                ready: false
+
+  /version:
+    get:
+      operationId: getVersion
+      summary: Server version information
+      security: []
+      description: Returns the server name, version, and beeping-core version.
+      tags: [operations]
+      responses:
+        "200":
+          description: Version info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionResponse"
+              example:
+                server: beepbox-server
+                version: 0.0.0
+                commit: a1b2c3d
+                built: "2026-04-17T10:00:00Z"
+                core: 2.0.0
+
+  /metrics:
+    get:
+      operationId: getMetrics
+      summary: Prometheus metrics
+      security: []
+      description: |
+        Returns server metrics in Prometheus exposition format.
+        Includes request counters, error counters, and uptime.
+      tags: [operations]
+      responses:
+        "200":
+          description: Metrics in Prometheus text format
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |
+                # HELP beepbox_uptime_seconds Time since server start.
+                # TYPE beepbox_uptime_seconds gauge
+                beepbox_uptime_seconds 3600
+
+                # HELP beepbox_requests_total Total HTTP requests.
+                # TYPE beepbox_requests_total counter
+                beepbox_requests_total 142
+
+  /v1/encode:
+    post:
+      operationId: encodePayload
+      summary: Encode a data payload into audio
+      description: |
+        Generates a WAV audio file containing the encoded payload as
+        ultrasonic or audible beeps. The payload is a 5-character base32
+        key that gets embedded into the audio signal.
+      tags: [encoding]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EncodeRequest"
+            examples:
+              minimal:
+                summary: Minimal request (only key required)
+                value:
+                  key: "a1b2c"
+              full:
+                summary: Full request with all parameters
+                value:
+                  key: "a1b2c"
+                  mode: inaudible
+                  sampleRate: 44100.0
+                  duration: 5.0
+                  start: 0.0
+                  interval: 2.3
+                  volumeBeeps: -3.0
+      responses:
+        "200":
+          description: WAV audio containing encoded beeps
+          headers:
+            X-Beeps-Generated:
+              description: Number of beep repetitions embedded in the audio
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrorResponse"
+              examples:
+                invalid_key:
+                  summary: Missing or invalid key
+                  value:
+                    errors:
+                      - "key must be exactly 5 base32 characters [0-9a-v]"
+                invalid_mode:
+                  summary: Invalid mode string
+                  value:
+                    error: "Invalid mode. Use: audible, inaudible, all"
+        "429":
+          description: Rate limit exceeded
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying
+              schema:
+                type: integer
+            X-RateLimit-Limit:
+              description: Max requests per window
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              description: Remaining requests in current window
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              description: Unix timestamp when the rate limit resets
+              schema:
+                type: integer
+                format: int64
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Rate limit exceeded"
+                hint: "Retry after 20 seconds"
+        "500":
+          description: Internal generation failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Failed to generate beeps"
+
+  /v1/decode:
+    post:
+      operationId: decodePayload
+      summary: Decode a data payload from audio
+      description: |
+        Accepts a WAV audio file (16-bit PCM, mono or stereo) and attempts
+        to decode an embedded Beeping payload. Uses ALL mode to auto-detect
+        whether the payload was encoded as audible or inaudible.
+      tags: [decoding]
+      requestBody:
+        required: true
+        content:
+          audio/wav:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Payload successfully decoded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DecodeResponse"
+              example:
+                decoded: "a1b2c"
+                confidence: 0.95
+                mode: 2
+        "400":
+          description: Invalid or missing WAV data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                empty_body:
+                  summary: Empty request body
+                  value:
+                    error: "Empty body. Send WAV audio data."
+                invalid_wav:
+                  summary: Malformed WAV file
+                  value:
+                    error: "Invalid WAV: not a valid RIFF/WAVE file"
+        "404":
+          description: No beeping data found in the audio
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "No beeping data found in audio"
+                hint: "Ensure the WAV contains encoded beeps (audible or inaudible)"
+        "422":
+          description: Decode detected data but extraction failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Decode returned invalid data"
+
+security:
+  - ApiKeyAuth: []
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      description: |
+        API key authentication. Keys are prefixed with `bk_`.
+        Pass as: `Authorization: Bearer bk_your_key_here`.
+        Operational endpoints (/healthz, /readyz, /version, /metrics)
+        do not require authentication.
+
+  schemas:
+    EncodeRequest:
+      type: object
+      required: [key]
+      properties:
+        key:
+          type: string
+          description: 5-character base32 payload to encode
+          minLength: 5
+          maxLength: 5
+          pattern: "^[0-9a-v]{5}$"
+          examples: ["a1b2c", "00000", "vvvvv"]
+        mode:
+          type: string
+          description: Encoding mode
+          enum: [audible, inaudible, all]
+          default: inaudible
+        sampleRate:
+          type: number
+          format: float
+          description: Audio sample rate in Hz
+          minimum: 22050
+          maximum: 96000
+          default: 44100.0
+        duration:
+          type: number
+          format: float
+          description: Total audio duration in seconds
+          minimum: 2.3
+          default: 2.3
+        start:
+          type: number
+          format: float
+          description: Offset in seconds before the first beep
+          minimum: 0.0
+          default: 0.0
+        interval:
+          type: number
+          format: float
+          description: Seconds between beep repetitions
+          minimum: 2.3
+          default: 2.3
+        volumeBeeps:
+          type: number
+          format: float
+          description: Beep gain in dB
+          minimum: -60.0
+          maximum: 12.0
+          default: -3.0
+
+    DecodeResponse:
+      type: object
+      required: [decoded, confidence, mode]
+      properties:
+        decoded:
+          type: string
+          description: The decoded base32 payload
+          examples: ["a1b2c"]
+        confidence:
+          type: number
+          format: float
+          description: Decode confidence score (0.0 to 1.0)
+          minimum: 0.0
+          maximum: 1.0
+        mode:
+          type: integer
+          description: |
+            Detected encoding mode as integer.
+            0 = audible, 1 = inaudible, 2 = all (auto-detected).
+
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          const: ok
+
+    ReadinessResponse:
+      type: object
+      required: [ready]
+      properties:
+        ready:
+          type: boolean
+          description: Whether the server can process requests
+
+    VersionResponse:
+      type: object
+      required: [server, version, commit, built, core]
+      properties:
+        server:
+          type: string
+          description: Server name
+          const: beepbox-server
+        version:
+          type: string
+          description: Server version (SemVer)
+          examples: ["0.0.0"]
+        commit:
+          type: string
+          description: Git commit SHA (short)
+          examples: ["a1b2c3d"]
+        built:
+          type: string
+          description: Build timestamp (ISO 8601 UTC)
+          examples: ["2026-04-17T10:00:00Z"]
+        core:
+          type: string
+          description: beeping-core library version
+          examples: ["2.0.0"]
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+        hint:
+          type: string
+          description: Suggestion for fixing the error
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Single error message (for mode/JSON parse errors)
+        errors:
+          type: array
+          items:
+            type: string
+          description: List of validation errors (for parameter validation)
