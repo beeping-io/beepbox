@@ -50,4 +50,17 @@ build
 include/configure.h
 
 # Beeps
-beeps
+beeps.cache/
+logs/
+build/
+
+# Generated OpenAPI clients (artifacts only, not committed)
+clients/
+
+# Terraform
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.backup
+infra/*.tfplan
+infra/terraform.tfvars
+infra/.terraform.lock.hcl

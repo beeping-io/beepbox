@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars and adjust
+project_id = "beeping-platform-dev"
+region     = "europe-west1"
+image_tag  = "latest"

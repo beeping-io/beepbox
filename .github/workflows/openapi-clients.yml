@@ -1,0 +1,91 @@
+name: OpenAPI Validate & Generate Clients
+
+on:
+  push:
+    paths:
+      - "docs/openapi.yaml"
+    branches: [develop, main]
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate OpenAPI spec
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install openapi-spec-validator
+      - run: openapi-spec-validator docs/openapi.yaml
+
+  generate-clients:
+    name: Generate ${{ matrix.language }} client
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - language: dart
+            generator: dart
+            output: clients/dart
+          - language: kotlin
+            generator: kotlin
+            output: clients/kotlin
+          - language: typescript
+            generator: typescript-fetch
+            output: clients/typescript
+          - language: python
+            generator: python
+            output: clients/python
+          - language: swift
+            generator: swift5
+            output: clients/swift
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate client
+        uses: openapi-generators/openapitools-generator-action@v1
+        with:
+          generator: ${{ matrix.generator }}
+          openapi-file: docs/openapi.yaml
+          command-args: >-
+            -o ${{ matrix.output }}
+            --additional-properties=packageName=beepbox_client
+            --additional-properties=projectName=beepbox-client
+
+      - name: Upload client artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: beepbox-client-${{ matrix.language }}
+          path: ${{ matrix.output }}
+          retention-days: 90
+
+  upload-release-assets:
+    name: Attach clients to release
+    if: github.event_name == 'release'
+    needs: generate-clients
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all client artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Package and upload
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for dir in artifacts/beepbox-client-*; do
+            lang="${dir##*-}"
+            tar czf "beepbox-client-${lang}.tar.gz" -C "$dir" .
+            gh release upload "${{ github.event.release.tag_name }}" \
+              "beepbox-client-${lang}.tar.gz" \
+              --repo "${{ github.repository }}"
+          done
