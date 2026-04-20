@@ -47,11 +47,15 @@ jobs:
             jsoncpp
 
       - name: Configure
+        # CMAKE_POLICY_VERSION_MINIMUM=3.5 lets third-party deps (libebur128)
+        # that declare cmake_minimum_required() below CMake 4.0's floor still
+        # configure under CMake ≥ 4.0.
         run: |
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Debug \
             -DBEEPBOX_BUILD_SERVER=ON \
-            -DBUILD_TESTING=ON
+            -DBUILD_TESTING=ON \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 
       - name: Build
         run: cmake --build build -j
