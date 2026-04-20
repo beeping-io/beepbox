@@ -54,6 +54,9 @@ beeps.cache/
 logs/
 build/
 
+# clangd / IDE caches
+.cache/
+
 # Generated OpenAPI clients (artifacts only, not committed)
 clients/
 
