@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop, "milestone/**"]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build & Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    # 30 min is enough for a cold drogon+beepbox build with FetchContent.
+    # Anything beyond that indicates the runner is stuck (saves credit).
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config \
+            libsndfile1-dev \
+            uuid-dev \
+            libssl-dev \
+            libbrotli-dev \
+            libjsoncpp-dev \
+            zlib1g-dev
+
+      - name: Install system deps (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew update
+          brew install \
+            pkg-config \
+            libsndfile \
+            ossp-uuid \
+            openssl@3 \
+            brotli \
+            jsoncpp
+
+      - name: Configure
+        # CMAKE_POLICY_VERSION_MINIMUM=3.5 lets third-party deps (libebur128)
+        # that declare cmake_minimum_required() below CMake 4.0's floor still
+        # configure under CMake ≥ 4.0.
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBEEPBOX_BUILD_SERVER=ON \
+            -DBUILD_TESTING=ON \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+
+      - name: Cache build tree
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: beepbox-deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
+          restore-keys: |
+            beepbox-deps-${{ runner.os }}-
+
+      - name: Build
+        # --parallel with explicit count — macOS-latest runners occasionally
+        # default to -j1 without it, making drogon FetchContent compile
+        # single-threaded and time out.
+        run: cmake --build build --parallel 3
+
+      - name: Test
+        working-directory: build
+        # Exclude CookieSameSite: pre-existing drogon internal test that
+        # requires an SSL cert fixture not shipped with the FetchContent
+        # build. Unrelated to beepbox sources.
+        run: ctest --output-on-failure -E "CookieSameSite"
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Markdown lint
+        uses: DavidAnson/markdownlint-cli2-action@v19
+        with:
+          globs: "**/*.md"
