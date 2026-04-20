@@ -13,6 +13,9 @@ jobs:
   build-and-test:
     name: Build & Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    # 30 min is enough for a cold drogon+beepbox build with FetchContent.
+    # Anything beyond that indicates the runner is stuck (saves credit).
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -57,8 +60,19 @@ jobs:
             -DBUILD_TESTING=ON \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 
+      - name: Cache build tree
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: beepbox-deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
+          restore-keys: |
+            beepbox-deps-${{ runner.os }}-
+
       - name: Build
-        run: cmake --build build -j
+        # --parallel with explicit count — macOS-latest runners occasionally
+        # default to -j1 without it, making drogon FetchContent compile
+        # single-threaded and time out.
+        run: cmake --build build --parallel 3
 
       - name: Test
         working-directory: build
