@@ -67,3 +67,6 @@ infra/*.tfstate.backup
 infra/*.tfplan
 infra/terraform.tfvars
 infra/.terraform.lock.hcl
+
+# clangd index
+.cache/
