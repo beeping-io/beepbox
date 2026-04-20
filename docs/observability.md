@@ -82,6 +82,7 @@ Available at `GET /metrics` in Prometheus exposition format.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `BEEPBOX_API_KEYS` | *(none)* | Comma-separated API keys (auth disabled if unset) |
+| `BEEPBOX_AUTH_ENDPOINT` | *(none)* | HTTPS URL of a validator returning `{"valid": bool, "ownerUid": string}` for a given `bk_` key. Takes precedence over `BEEPBOX_API_KEYS`. Used in prod/dev against a Firebase Cloud Function. |
+| `BEEPBOX_API_KEYS` | *(none)* | Fallback for local dev: comma-separated static list of valid `bk_` keys. Used only if `BEEPBOX_AUTH_ENDPOINT` is unset. |
 | `BEEPBOX_RATE_LIMIT_RPM` | *(none)* | Requests per minute per key (disabled if unset) |
 | `GCP_PROJECT_ID` | *(none)* | Used to format Cloud Trace resource names |

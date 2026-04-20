@@ -136,9 +136,22 @@ if(BEEPBOX_BUILD_SERVER)
   )
   FetchContent_MakeAvailable(drogon)
 
+  # cpp-httplib for outgoing HTTPS (HttpKeyStore validator). Header-only,
+  # uses OpenSSL which Drogon already pulls in.
+  FetchContent_Declare(
+    cpp-httplib
+    GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
+    GIT_TAG        v0.18.3
+    GIT_SHALLOW    TRUE
+  )
+  FetchContent_MakeAvailable(cpp-httplib)
+
+  find_package(OpenSSL REQUIRED)
+
   add_executable(beepbox-server
     src/server_main.cpp
     src/ApiKeyAuth.cpp
+    src/HttpKeyStoreFactory.cpp
     src/RateLimiter.cpp
     src/Metrics.cpp
     src/Tracing.cpp
@@ -157,6 +170,9 @@ if(BEEPBOX_BUILD_SERVER)
   target_link_libraries(beepbox-server PRIVATE
     beepbox_lib
     drogon
+    httplib::httplib
+    OpenSSL::SSL
+    OpenSSL::Crypto
   )
 endif()
 
@@ -204,6 +220,7 @@ if(BUILD_TESTING)
     tests/RoundTripTests.cpp
     tests/ConcurrencyTests.cpp
     tests/ApiKeyAuthTests.cpp
+    tests/HttpKeyStoreTests.cpp
     tests/RateLimiterTests.cpp
     tests/MetricsTests.cpp
     tests/TracingTests.cpp

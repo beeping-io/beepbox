@@ -5,6 +5,7 @@
 #include "beepbox/WavWriter.h"
 #include "beepbox/WavReader.h"
 #include "beepbox/ApiKeyAuth.h"
+#include "beepbox/HttpKeyStore.h"
 #include "beepbox/RateLimiter.h"
 #include "beepbox/Metrics.h"
 #include "beepbox/Tracing.h"
@@ -13,6 +14,7 @@
 #include <csignal>
 #include <cstdlib>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <algorithm>
 #include <vector>
@@ -32,8 +34,10 @@ using namespace drogon;
 // --- Metrics collector (initialized in main) ---
 static beepbox::MetricsCollector* g_metrics = nullptr;
 
-// Shared auth state (initialized in main)
-static beepbox::EnvKeyStore* g_keyStore = nullptr;
+// Shared auth state (initialized in main). Backed by an abstract KeyStore so
+// we can swap in EnvKeyStore (dev), HttpKeyStore (prod, via Cloud Function),
+// or future stores without touching request handlers.
+static beepbox::KeyStore* g_keyStore = nullptr;
 static beepbox::KeyCache* g_keyCache = nullptr;
 static bool g_authEnabled = false;
 
@@ -91,20 +95,44 @@ static bool checkRateLimit(
 
 int main() {
   // --- Auth setup ---
-  static beepbox::EnvKeyStore keyStore;
+  //
+  // Priority order:
+  //   1. BEEPBOX_AUTH_ENDPOINT (URL) → HttpKeyStore backed by a Cloud
+  //      Function validator + Firestore. Used in prod/dev envs.
+  //   2. BEEPBOX_API_KEYS (CSV list) → EnvKeyStore. Used for local dev /
+  //      smoke tests.
+  //   3. Neither set → auth disabled (warning logged, permissive).
   static beepbox::KeyCache keyCache;
-  g_keyStore = &keyStore;
   g_keyCache = &keyCache;
-  g_authEnabled = !keyStore.empty();
+
+  static std::unique_ptr<beepbox::KeyStore> keyStorePtr;
+  const char* authEndpoint = std::getenv("BEEPBOX_AUTH_ENDPOINT");
+  const char* envKeys = std::getenv("BEEPBOX_API_KEYS");
+
+  if (authEndpoint && authEndpoint[0] != '\0') {
+    keyStorePtr = std::make_unique<beepbox::HttpKeyStore>(
+        beepbox::makeHttpKeyStoreFromEndpoint(authEndpoint));
+    g_keyStore = keyStorePtr.get();
+    g_authEnabled = true;
+    std::cout << "API key authentication enabled (HTTP validator: "
+              << authEndpoint << ")\n";
+  } else if (envKeys && envKeys[0] != '\0') {
+    keyStorePtr = std::make_unique<beepbox::EnvKeyStore>();
+    g_keyStore = keyStorePtr.get();
+    g_authEnabled =
+        !static_cast<beepbox::EnvKeyStore*>(keyStorePtr.get())->empty();
+    if (g_authEnabled) {
+      std::cout << "API key authentication enabled (env keys)\n";
+    }
+  }
 
   // --- Metrics setup ---
   static beepbox::MetricsCollector metricsCollector;
   g_metrics = &metricsCollector;
 
-  if (g_authEnabled) {
-    std::cout << "API key authentication enabled\n";
-  } else {
-    std::cout << "WARNING: BEEPBOX_API_KEYS not set — auth disabled (dev mode)\n";
+  if (!g_authEnabled) {
+    std::cout << "WARNING: neither BEEPBOX_AUTH_ENDPOINT nor BEEPBOX_API_KEYS "
+                 "set — auth disabled (dev mode)\n";
   }
 
   // --- Rate limiter setup ---
