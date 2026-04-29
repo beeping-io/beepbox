@@ -54,4 +54,48 @@ Usa el skill `/pending` (recomendado). O copia este bloque al final del fichero:
 
 ## 🗂️ Pendientes registrados
 
-> _Aún no hay pendings. Añade el primero con `/pending`._
+### ⏳ pending-001 — Wire WIF for `deploy.yml` workflow
+
+- 📅 **Fecha añadida**: 2026-04-29
+- 🏷️ **Tipo**: infra
+- 🧭 **Trigger**: durante el deploy de BEE-1794 (CORS) descubrimos
+  que `deploy.yml` falla en el step `Authenticate to GCP` porque
+  los secrets `WIF_PROVIDER` y `WIF_SA` no están configurados en
+  el repo `beepbox`. El workflow se quedó a medio bootstrappear —
+  probablemente desde BEE-1691 (CI) cuando se creó la pipeline.
+  Workaround usado para BEE-1794: build local + `gcloud run deploy`
+  desde la máquina del founder.
+- ⚙️ **Acción requerida**: crear el Workload Identity Pool +
+  Provider en GCP (`beeping-platform-dev` project), un Service
+  Account con permisos `roles/artifactregistry.writer` +
+  `roles/run.admin` + `roles/iam.serviceAccountUser`, bind GitHub
+  org/repo via principalSet, exportar provider name + SA email a
+  GitHub Actions secrets `WIF_PROVIDER` + `WIF_SA`. Documentar el
+  setup en `docs/deploy-runbook.md`.
+- 🚧 **Bloqueado por**: nada bloquea — siguiente release a Cloud
+  Run forzará el setup. Mientras, deploys siguen siendo manuales
+  via `gcloud` + Docker local.
+- 🚦 **Estado**: 🆕 Nuevo
+
+### ⏳ pending-002 — `/healthz` interceptado por Google Frontend
+
+- 📅 **Fecha añadida**: 2026-04-29
+- 🏷️ **Tipo**: infra
+- 🧭 **Trigger**: durante la verificación post-deploy de BEE-1794
+  observamos que `GET /healthz` desde fuera devuelve un HTML 404
+  de Google Frontend (no llega a nuestro server), aunque el mismo
+  endpoint funciona para los probes internos del Cloud Run y
+  externamente `/readyz` y `/version` responden correctamente
+  desde nuestro app. Probable: Cloud Run / GFE intercepta
+  `/healthz` para health-check interno y nunca lo enruta al
+  contenedor desde tráfico externo, mientras que internamente
+  para probes sí funciona. Cosmético (`/readyz` cubre el mismo
+  uso para callers externos), pero confunde si alguien debugea el
+  servicio con curl.
+- ⚙️ **Acción requerida**: investigar si Cloud Run reserva
+  `/healthz`. Si sí, documentar en `docs/deploy-runbook.md` que
+  los callers externos deben usar `/readyz`. Si no, abrir issue
+  con GCP support.
+- 🚧 **Bloqueado por**: nada — bug cosmético, no afecta
+  funcionalidad.
+- 🚦 **Estado**: 🆕 Nuevo
