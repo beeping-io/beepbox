@@ -9,6 +9,7 @@
 #include "beepbox/RateLimiter.h"
 #include "beepbox/Metrics.h"
 #include "beepbox/Tracing.h"
+#include "beepbox/CorsConfig.h"
 
 #include <chrono>
 #include <csignal>
@@ -143,6 +144,25 @@ int main() {
     std::cout << "Rate limiting enabled\n";
   } else {
     std::cout << "WARNING: BEEPBOX_RATE_LIMIT_RPM not set — rate limiting disabled\n";
+  }
+
+  // --- CORS setup ---
+  // Whitelist comes from BEEPBOX_CORS_ALLOWED_ORIGINS (CSV). Empty/unset
+  // → no advice registered → request pipeline behaves identically to
+  // pre-1794 server-to-server-only mode.
+  {
+    const char* corsEnv = std::getenv("BEEPBOX_CORS_ALLOWED_ORIGINS");
+    beepbox::CorsConfig corsCfg(beepbox::CorsConfig::parseAllowedOrigins(
+        corsEnv ? std::string_view{corsEnv} : std::string_view{}));
+    if (corsCfg.enabled()) {
+      std::cout << "CORS enabled for " << corsCfg.allowedOrigins().size()
+                << " origin(s):";
+      for (const auto& o : corsCfg.allowedOrigins()) std::cout << " " << o;
+      std::cout << "\n";
+      beepbox::installCorsHandlers(std::move(corsCfg));
+    } else {
+      std::cout << "CORS disabled (BEEPBOX_CORS_ALLOWED_ORIGINS not set)\n";
+    }
   }
 
   // --- /healthz — liveness probe ---

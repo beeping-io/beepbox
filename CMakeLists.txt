@@ -155,6 +155,8 @@ if(BEEPBOX_BUILD_SERVER)
     src/RateLimiter.cpp
     src/Metrics.cpp
     src/Tracing.cpp
+    src/CorsConfig.cpp
+    src/CorsAdvice.cpp
   )
 
   target_include_directories(beepbox-server PRIVATE
@@ -224,10 +226,12 @@ if(BUILD_TESTING)
     tests/RateLimiterTests.cpp
     tests/MetricsTests.cpp
     tests/TracingTests.cpp
+    tests/CorsConfigTests.cpp
     src/ApiKeyAuth.cpp
     src/RateLimiter.cpp
     src/Metrics.cpp
     src/Tracing.cpp
+    src/CorsConfig.cpp
   )
 
   target_link_libraries(BeepBoxTests PRIVATE beepbox_lib Catch2::Catch2WithMain)

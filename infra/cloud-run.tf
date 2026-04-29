@@ -53,6 +53,14 @@ resource "google_cloud_run_v2_service" "beepbox" {
         value = "8"
       }
 
+      # CORS allowed origins (CSV). Empty/unset disables CORS — kept
+      # disabled for prod until BEE-1794 lands a separate prod deploy
+      # so the dev rollout doesn't affect server-to-server callers.
+      env {
+        name  = "BEEPBOX_CORS_ALLOWED_ORIGINS"
+        value = var.cors_allowed_origins
+      }
+
       startup_probe {
         http_get {
           path = "/healthz"
