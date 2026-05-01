@@ -71,7 +71,7 @@ Usa el skill `/pending` (recomendado). O copia este bloque al final del fichero:
   `roles/run.admin` + `roles/iam.serviceAccountUser`, bind GitHub
   org/repo via principalSet, exportar provider name + SA email a
   GitHub Actions secrets `WIF_PROVIDER` + `WIF_SA`. Documentar el
-  setup en `docs/deploy-runbook.md`.
+  setup en `docs/ops/deploy-runbook.md`.
 - 🚧 **Bloqueado por**: nada bloquea — siguiente release a Cloud
   Run forzará el setup. Mientras, deploys siguen siendo manuales
   via `gcloud` + Docker local.
@@ -93,7 +93,7 @@ Usa el skill `/pending` (recomendado). O copia este bloque al final del fichero:
   uso para callers externos), pero confunde si alguien debugea el
   servicio con curl.
 - ⚙️ **Acción requerida**: investigar si Cloud Run reserva
-  `/healthz`. Si sí, documentar en `docs/deploy-runbook.md` que
+  `/healthz`. Si sí, documentar en `docs/ops/deploy-runbook.md` que
   los callers externos deben usar `/readyz`. Si no, abrir issue
   con GCP support.
 - 🚧 **Bloqueado por**: nada — bug cosmético, no afecta

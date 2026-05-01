@@ -60,6 +60,11 @@ build/
 # Generated OpenAPI clients (artifacts only, not committed)
 clients/
 
+# Local secrets (synced via GCP Secret Manager — see ~/.claude/scripts/sync-env-to-gcp.sh)
+.env
+.env.local
+.env.*.local
+
 # Terraform
 infra/.terraform/
 infra/*.tfstate

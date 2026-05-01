@@ -3,7 +3,7 @@ name: OpenAPI Validate & Generate Clients
 on:
   push:
     paths:
-      - "docs/openapi.yaml"
+      - "docs/api/openapi.yaml"
     branches: [develop, main]
   release:
     types: [published]
@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install openapi-spec-validator
-      - run: openapi-spec-validator docs/openapi.yaml
+      - run: openapi-spec-validator docs/api/openapi.yaml
 
   generate-clients:
     name: Generate ${{ matrix.language }} client
@@ -52,7 +52,7 @@ jobs:
         uses: openapi-generators/openapitools-generator-action@v1
         with:
           generator: ${{ matrix.generator }}
-          openapi-file: docs/openapi.yaml
+          openapi-file: docs/api/openapi.yaml
           command-args: >-
             -o ${{ matrix.output }}
             --additional-properties=packageName=beepbox_client
