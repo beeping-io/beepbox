@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SPEC="$SCRIPT_DIR/../docs/openapi.yaml"
+SPEC="$SCRIPT_DIR/../docs/api/openapi.yaml"
 VENV="/tmp/openapi-venv"
 
 if [ ! -f "$VENV/bin/openapi-spec-validator" ]; then

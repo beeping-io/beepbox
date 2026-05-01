@@ -6,7 +6,7 @@ single source of truth for all endpoints, schemas, and examples.
 ## Interactive documentation
 
 Open the spec in [Scalar](https://docs.scalar.com/swagger-editor) by
-pasting the raw URL or uploading `docs/openapi.yaml`.
+pasting the raw URL or uploading `docs/api/openapi.yaml`.
 
 To browse locally with the server running:
 
