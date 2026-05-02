@@ -4,8 +4,8 @@ Snapshot del estado real de los entornos GCP donde corre `beepbox-server`.
 **Vive en git porque es code-adjacent.** Este documento se actualiza a
 mano cuando cambia el bootstrap; no es source-of-truth automatizado.
 
-> Última actualización: 2026-05-02 — tras BEE-1799 (Terraform multi-env
-> + GCS backend + prod parity).
+> Última actualización: 2026-05-02 — tras BEE-1800 (prod imagen al sha
+> de dev + CORS verificado).
 
 ## Resumen ejecutivo
 
@@ -16,7 +16,7 @@ alinea).
 | | **dev** (`beeping-platform-dev`) | **prod** (`beeping-platform-prod`) |
 |---|---|---|
 | Cloud Run URL | `beepbox-server-ai7n45q5lq-ew.a.run.app` | `beepbox-server-jlqkyqxtca-ew.a.run.app` |
-| Imagen actual | `sha-96cf4a8` (BEE-1794, 2026-04-29) | `:latest` (revision 00002, post-BEE-1799 — BEE-1800 la actualiza al sha de dev) |
+| Imagen actual | `sha-96cf4a8` (BEE-1794, 2026-04-29) | `sha-96cf4a8` (revision 00003, copiado de dev AR via crane en BEE-1800) |
 | Service Account | `beepbox-server@…dev` dedicado, least-privilege | `beepbox-server@…prod` dedicado, least-privilege |
 | Secret Manager | `beepbox-api-keys` + `beepbox-rate-limit-rpm` | `beepbox-api-keys` + `beepbox-rate-limit-rpm` (placeholders) |
 | `BEEPBOX_AUTH_ENDPOINT` | `…dev.cloudfunctions.net/validateApiKey` | `…prod.cloudfunctions.net/validateApiKey` |
@@ -118,13 +118,18 @@ gcloud run deploy beepbox-server \
 - ✅ Prod managed by Terraform (sin drift)
 - ✅ State remoto en GCS, versionado, sin riesgo de pérdida local
 
+## Riesgos cerrados por BEE-1800
+
+- ✅ Prod corre el mismo binario que dev (`sha-96cf4a8`)
+- ✅ CORS verificado: `https://beeping.io` permitido en prod;
+  `localhost`, `www.beeping.io`, `app.beeping.io` rebotan (sin
+  `Access-Control-Allow-Origin`)
+
 ## Riesgos abiertos (siguientes tasks de Phase 2)
 
-1. **Prod imagen desfasada** (build 2026-04-23, antes de BEE-1794) →
-   BEE-1800 (T2) actualiza al sha actual.
-2. **`generateApiKey` + `revokeApiKey` públicos (`allUsers`)** → BEE-1801
+1. **`generateApiKey` + `revokeApiKey` públicos (`allUsers`)** → BEE-1801
    (T3) cierra el agujero con Firebase Auth.
-3. **Sin keys de testing en `.env.local`** → BEE-1802 (T4) genera keys
+2. **Sin keys de testing en `.env.local`** → BEE-1802 (T4) genera keys
    y las guarda.
-4. **WIF no cableado, deploys manuales** → BEE-1803 (T5).
-5. **Custom domain DNS no resuelve** → BEE-1804 (T6).
+3. **WIF no cableado, deploys manuales** → BEE-1803 (T5).
+4. **Custom domain DNS no resuelve** → BEE-1804 (T6).
