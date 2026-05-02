@@ -4,121 +4,134 @@ Snapshot del estado real de los entornos GCP donde corre `beepbox-server`.
 **Vive en git porque es code-adjacent.** Este documento se actualiza a
 mano cuando cambia el bootstrap; no es source-of-truth automatizado.
 
-> Última actualización: 2026-05-01 — tras BEE-1794 (CORS).
+> Última actualización: 2026-05-02 — tras BEE-1804 (custom domains
+> registrados en Firebase Hosting; CNAMEs en GoDaddy pendiente).
 
 ## Resumen ejecutivo
 
-Hay **dos entornos GCP** distintos, mismo código pero **bootstrap muy
-asimétrico**: dev está montado con Terraform y service account dedicado,
-prod se desplegó a mano sin Terraform y usa el SA por defecto de Compute
-Engine.
+Dos entornos GCP bajo la misma definición de Terraform multi-env. Estado
+y bootstrap **idéntico** salvo por las URLs y la imagen actual (T2 las
+alinea).
 
 | | **dev** (`beeping-platform-dev`) | **prod** (`beeping-platform-prod`) |
 |---|---|---|
 | Cloud Run URL | `beepbox-server-ai7n45q5lq-ew.a.run.app` | `beepbox-server-jlqkyqxtca-ew.a.run.app` |
-| Imagen actual | `sha-96cf4a8` (BEE-1794, 2026-04-29) | `:latest` (revision 00001, 2026-04-23) |
-| Service Account | `beepbox-server@…dev` dedicado, least-privilege | ⚠️ `compute default` (`638946150252-compute@…`) |
-| Secret Manager | `beepbox-api-keys` + `beepbox-rate-limit-rpm` | ⚠️ no existen — solo `RESEND_API_KEY` |
+| Imagen actual | `sha-96cf4a8` (BEE-1794, 2026-04-29) | `sha-96cf4a8` (revision 00003, copiado de dev AR via crane en BEE-1800) |
+| Service Account | `beepbox-server@…dev` dedicado, least-privilege | `beepbox-server@…prod` dedicado, least-privilege |
+| Secret Manager | `beepbox-api-keys` + `beepbox-rate-limit-rpm` | `beepbox-api-keys` + `beepbox-rate-limit-rpm` (placeholders) |
 | `BEEPBOX_AUTH_ENDPOINT` | `…dev.cloudfunctions.net/validateApiKey` | `…prod.cloudfunctions.net/validateApiKey` |
-| CORS | habilitado (localhost:3000 + dev Firebase) | desactivado |
+| CORS | `localhost:3000` + dev Firebase hosts | `https://beeping.io` (sin localhost, sin subdominios) |
 | Artifact Registry | `beepbox/` repo en `europe-west1` | `beepbox/` repo en `europe-west1` |
-| Firebase Hosting | site `api` con rewrite a Cloud Run | no aplicado |
-| Custom domain | `api.beeping.io` → CNAME pendiente | n/a |
+| Firebase Hosting | site `beeping-platform-dev-api` | site `beeping-platform-prod-api` |
+| Custom domain | `beepbox-dev.beeping.io` (Firebase registrado, esperando CNAME GoDaddy) | `beepbox.beeping.io` (Firebase registrado, esperando CNAME GoDaddy) |
 
-`/version` responde 200 en ambos. `api.beeping.io` no resuelve (DNS
-pendiente en GoDaddy).
+`/version` responde 200 en ambos.
 
 ## Capas de credenciales
 
 ### Capa 1 — API keys de clientes (las que el caller manda en `Authorization`)
 
-- Se **generan/validan/revocan en Cloud Functions**, no en este repo.
-  Trío `generateApiKey` / `validateApiKey` / `revokeApiKey` desplegado
-  en `europe-west1`, en dev y prod.
-- Esas Functions **viven en otro repo** (probablemente
-  `beeping-functions` — TODO confirmar y enlazar aquí).
-- `beepbox-server` **no tiene store local de keys**: las valida
-  remotamente vía `BEEPBOX_AUTH_ENDPOINT` (HttpKeyStore añadido en
-  BEE-1687). El env var `BEEPBOX_API_KEYS` que aparece en dev es legacy
-  CSV — fallback, pero el camino real es la Cloud Function.
+- Se generan/validan/revocan en **Cloud Functions** (TypeScript +
+  Firebase Functions) que viven en `beeping-www/functions/`. Trío
+  `generateApiKey` / `validateApiKey` / `revokeApiKey` desplegado en
+  `europe-west1`, en dev y prod.
+- `beepbox-server` no tiene store local de keys: las valida remotamente
+  vía `BEEPBOX_AUTH_ENDPOINT` (HttpKeyStore añadido en BEE-1687).
+- **TODO** (BEE-1801, T3): cerrar `allUsers` invoker en
+  `generateApiKey` / `revokeApiKey` y exigir Firebase Auth.
 
 ### Capa 2 — credenciales de infra (runtime + deploys)
 
-- **Runtime Cloud Run (dev)**: SA `beepbox-server@…dev` con
+- **Runtime Cloud Run** (dev y prod): SA dedicado
+  `beepbox-server@{project}.iam.gserviceaccount.com` con
   `artifactregistry.reader` + `secretmanager.secretAccessor` +
-  `logging.logWriter` + `cloudtrace.agent`. Definido en `infra/iam.tf`.
-  **En prod no se aplicó** — usa el SA default de Compute Engine
-  (demasiado amplio).
-- **Deploys CI**: `.github/workflows/deploy.yml` espera secrets
-  `WIF_PROVIDER` + `WIF_SA` (Workload Identity Federation). **Nunca se
-  han creado** (ver `PENDING.md` → pending-001). Por eso BEE-1794 se
-  desplegó a mano: `docker build` local + `gcloud run deploy`.
-- **Secrets de servidor (dev)**: en Secret Manager
-  (`beepbox-api-keys`, `beepbox-rate-limit-rpm`). Inyectados como env
-  vars vía `value_source.secret_key_ref` con `version=latest`. Cloud
-  Run los pickup en cold start.
+  `logging.logWriter` + `cloudtrace.agent`. Definido en
+  `infra/modules/iam/`.
+- **Secrets de servidor**: en Secret Manager (`beepbox-api-keys`,
+  `beepbox-rate-limit-rpm`). Inyectados como env vars vía
+  `value_source.secret_key_ref` con `version=latest`. Valores se
+  rotan out-of-band con `gcloud secrets versions add` (Terraform
+  ignora cambios al `secret_data` para no sobrescribir).
+- **Deploys CI**: `.github/workflows/deploy.yml` autenticado vía WIF
+  (BEE-1803), soporta `target=dev|prod`. Detalles en
+  [`docs/ops/ci-cd.md`](ci-cd.md).
 
 ## Terraform
 
-`infra/` tiene todo (artifact-registry, cloud-run, firebase-hosting,
-iam, secrets) **pero los defaults apuntan solo a `beeping-platform-dev`**.
+Layout multi-env con módulos compartidos:
 
-- No hay workspace ni `tfvars` para prod → **prod nunca se aplicó con
-  Terraform** (deploy manual).
-- `terraform.tfstate` vive **local en `infra/`**. El backend GCS está
-  comentado en `main.tf` — sin remote state, sin lock, sin colaboración
-  segura.
+```
+infra/
+├── modules/        artifact-registry, cloud-run, firebase-hosting, iam, secrets
+└── envs/
+    ├── dev/        backend gcs · prefix=beepbox/dev
+    └── prod/       backend gcs · prefix=beepbox/prod
+```
+
+State remoto en `gs://beeping-platform-dev-terraform/beepbox/{env}`,
+versionado activo.
+
+```bash
+cd infra/envs/{dev|prod}
+terraform plan
+terraform apply
+```
+
+Ver `infra/README.md` para operativa completa.
 
 ## Flujo de deploy actual
 
-### Pretendido (CI)
+### Pretendido (CI · cuando T5 termine)
 
-1. Release published o `workflow_dispatch` →
-2. `.github/workflows/deploy.yml` autentica con WIF →
-3. build + push a AR →
-4. `google-github-actions/deploy-cloudrun` →
+1. Release published o `workflow_dispatch -f target={dev|prod}` →
+2. `.github/workflows/deploy.yml` autentica con WIF al proyecto target →
+3. build + push a AR del proyecto target →
+4. `deploy-cloudrun` →
 5. `scripts/smoke.sh` →
 6. Rollback automático si smoke falla.
 
-### Real hoy
-
-Pipeline bloqueado porque WIF nunca se cableó. Cada release se hace a
-mano:
+### Real hoy (hasta T5)
 
 ```bash
+# Build y push (target=dev | prod):
 docker buildx build --platform linux/amd64 \
-  -t europe-west1-docker.pkg.dev/beeping-platform-dev/beepbox/beepbox-server:vX.Y.Z \
+  -t europe-west1-docker.pkg.dev/beeping-platform-{env}/beepbox/beepbox-server:vX.Y.Z \
   --push .
 
 gcloud run deploy beepbox-server \
-  --image europe-west1-docker.pkg.dev/beeping-platform-dev/beepbox/beepbox-server:vX.Y.Z \
+  --image europe-west1-docker.pkg.dev/beeping-platform-{env}/beepbox/beepbox-server:vX.Y.Z \
   --region europe-west1 \
-  --project beeping-platform-dev
+  --project beeping-platform-{env}
 ```
 
-(es lo que hicimos para BEE-1794, registrado en commit `19f13f2`.)
+## Riesgos cerrados por BEE-1804
 
-## Pendientes registrados (`docs/PENDING.md`)
+- ✅ Custom domains registrados en Firebase Hosting:
+  `beepbox.beeping.io` (prod), `beepbox-dev.beeping.io` (dev).
+  Faltan CNAMEs en GoDaddy para que SSL provisione.
+- ✅ `/healthz` 404 desde fuera (antes `pending-002`): documentado en
+  `docs/ops/deploy-runbook.md` como comportamiento esperado de Cloud
+  Run (GFE reserva `/healthz` para probes internos). Callers externos
+  usan `/readyz`.
 
-- **pending-001** — Crear WIF Pool/Provider + SA con
-  `artifactregistry.writer` + `run.admin` + `iam.serviceAccountUser`,
-  bind al repo GitHub, exportar a `WIF_PROVIDER` / `WIF_SA`.
-  Desbloquea `deploy.yml`.
-- **pending-002** — `/healthz` desde fuera devuelve HTML 404 de Google
-  Frontend (parece reservado por GFE). Cosmético — usamos `/readyz`
-  para callers externos.
+## Riesgos cerrados por BEE-1799
 
-## Riesgos / inconsistencias detectadas
+- ✅ Prod con SA dedicado + secrets en Secret Manager
+- ✅ Prod managed by Terraform (sin drift)
+- ✅ State remoto en GCS, versionado, sin riesgo de pérdida local
 
-1. **Prod sin secrets de beepbox ni SA dedicado.** Si el server prod
-   intenta leer `BEEPBOX_API_KEYS` o `BEEPBOX_RATE_LIMIT_RPM` desde env
-   fallará silenciosamente o caerá a defaults. Confirmar que prod tira
-   **solo** de `BEEPBOX_AUTH_ENDPOINT` y no necesita el CSV.
-2. **Prod fuera de Terraform.** Sin IaC reproducible para prod. Drift
-   garantizado entre lo que hay desplegado y lo que define `infra/`.
-3. **WIF no cableado.** Todo deploy es manual desde la máquina del
-   founder.
-4. **Custom domain `api.beeping.io` no resuelve.** Falta CNAME en
-   GoDaddy apuntando a `beeping-platform-dev-api.web.app`.
-5. **Terraform state local.** `infra/terraform.tfstate` no está en GCS
-   — riesgo de pérdida y bloqueo de colaboración.
+## Riesgos cerrados por BEE-1800
+
+- ✅ Prod corre el mismo binario que dev (`sha-96cf4a8`)
+- ✅ CORS verificado: `https://beeping.io` permitido en prod;
+  `localhost`, `www.beeping.io`, `app.beeping.io` rebotan (sin
+  `Access-Control-Allow-Origin`)
+
+## Riesgos abiertos (siguientes tasks de Phase 2)
+
+1. **`generateApiKey` + `revokeApiKey` públicos (`allUsers`)** → BEE-1801
+   (T3) cierra el agujero con Firebase Auth.
+2. **Sin keys de testing en `.env.local`** → BEE-1802 (T4) genera keys
+   y las guarda.
+3. **WIF no cableado, deploys manuales** → BEE-1803 (T5).
+4. **Custom domain DNS no resuelve** → BEE-1804 (T6).

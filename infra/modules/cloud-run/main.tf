@@ -1,18 +1,17 @@
-# beepbox-server Cloud Run service
 resource "google_cloud_run_v2_service" "beepbox" {
   name     = "beepbox-server"
   location = var.region
 
   template {
-    service_account = google_service_account.beepbox_server.email
+    service_account = var.service_account_email
 
     scaling {
-      min_instance_count = 0   # Scale to zero (dev — no cost when idle)
-      max_instance_count = 10
+      min_instance_count = var.min_instance_count
+      max_instance_count = var.max_instance_count
     }
 
     containers {
-      image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.beepbox.repository_id}/beepbox-server:${var.image_tag}"
+      image = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repository_id}/beepbox-server:${var.image_tag}"
 
       ports {
         container_port = 8080
@@ -23,26 +22,24 @@ resource "google_cloud_run_v2_service" "beepbox" {
           cpu    = "1"
           memory = "512Mi"
         }
-        cpu_idle = true  # CPU only allocated during requests (saves cost)
+        cpu_idle = true
       }
 
-      # API keys from Secret Manager
       env {
         name = "BEEPBOX_API_KEYS"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.api_keys.secret_id
+            secret  = var.api_keys_secret_id
             version = "latest"
           }
         }
       }
 
-      # Rate limit from Secret Manager
       env {
         name = "BEEPBOX_RATE_LIMIT_RPM"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.rate_limit.secret_id
+            secret  = var.rate_limit_secret_id
             version = "latest"
           }
         }
@@ -50,12 +47,14 @@ resource "google_cloud_run_v2_service" "beepbox" {
 
       env {
         name  = "BEEPBOX_DRAIN_TIMEOUT_S"
-        value = "8"
+        value = tostring(var.drain_timeout_s)
       }
 
-      # CORS allowed origins (CSV). Empty/unset disables CORS — kept
-      # disabled for prod until BEE-1794 lands a separate prod deploy
-      # so the dev rollout doesn't affect server-to-server callers.
+      env {
+        name  = "BEEPBOX_AUTH_ENDPOINT"
+        value = var.auth_endpoint
+      }
+
       env {
         name  = "BEEPBOX_CORS_ALLOWED_ORIGINS"
         value = var.cors_allowed_origins
@@ -84,15 +83,15 @@ resource "google_cloud_run_v2_service" "beepbox" {
     timeout                          = "30s"
   }
 
-  # Allow unauthenticated access (API key auth is handled by the app)
   lifecycle {
     ignore_changes = [
-      template[0].containers[0].image,  # Updated by CI, not Terraform
+      template[0].containers[0].image,
+      client,
+      client_version,
     ]
   }
 }
 
-# Allow public (unauthenticated) access to Cloud Run
 resource "google_cloud_run_v2_service_iam_member" "public" {
   name     = google_cloud_run_v2_service.beepbox.name
   location = var.region

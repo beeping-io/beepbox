@@ -28,10 +28,21 @@ open "https://docs.scalar.com/swagger-editor?url=http://localhost:8080/openapi.y
 | `POST` | `/v1/encode` | Encode payload → WAV audio |
 | `POST` | `/v1/decode` | Decode WAV audio → payload |
 
+## Canonical hosts
+
+| Environment | URL |
+|---|---|
+| Production | `https://beepbox.beeping.io` |
+| Development | `https://beepbox-dev.beeping.io` |
+| Local | `http://localhost:8080` (running `./build/beepbox-server`) |
+
+`/v1/*` requires `Authorization: Bearer <api_key>` (see BEE-1687).
+
 ## Example: encode
 
 ```bash
-curl -X POST http://localhost:8080/v1/encode \
+curl -X POST https://beepbox.beeping.io/v1/encode \
+  -H "Authorization: Bearer $BEEPBOX_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"key": "a1b2c", "mode": "inaudible"}' \
   -o output.wav
@@ -40,7 +51,8 @@ curl -X POST http://localhost:8080/v1/encode \
 ## Example: decode
 
 ```bash
-curl -X POST http://localhost:8080/v1/decode \
+curl -X POST https://beepbox.beeping.io/v1/decode \
+  -H "Authorization: Bearer $BEEPBOX_API_KEY" \
   -H "Content-Type: audio/wav" \
   --data-binary @output.wav
 ```

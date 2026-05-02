@@ -19,6 +19,10 @@
   manual + rollback + troubleshooting.
 - [`ops/supply-chain.md`](ops/supply-chain.md) — firma de imágenes,
   SBOM, attestations.
+- [`ops/ci-cd.md`](ops/ci-cd.md) — Workload Identity Federation +
+  multi-env deploys (`gh workflow run deploy.yml -f target=...`).
+- [`ops/test-credentials.md`](ops/test-credentials.md) — test API
+  keys for SDK E2E suites (`BEEPBOX_TEST_KEY_{DEV,PROD}`).
 
 ## Observability — qué se ve en runtime
 
