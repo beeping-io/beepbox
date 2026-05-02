@@ -5,46 +5,62 @@ on:
     types: [published]
   workflow_dispatch:
     inputs:
+      target:
+        description: "Target environment"
+        type: choice
+        options:
+          - dev
+          - prod
+        default: dev
       image_tag:
-        description: "Image tag to deploy (e.g. v0.1.0 or sha-abc1234)"
-        required: true
-        default: "latest"
+        description: "Image tag to deploy (e.g. v0.1.0 or sha-abc1234). Empty = derive from sha."
+        required: false
+        default: ""
 
 permissions:
   contents: read
-  packages: write
   id-token: write
 
 env:
-  PROJECT_ID: beeping-platform-dev
   REGION: europe-west1
   SERVICE: beepbox-server
-  AR_REPO: europe-west1-docker.pkg.dev/beeping-platform-dev/beepbox
 
 jobs:
-  build-and-push:
-    name: Build & Push to Artifact Registry
+  deploy:
+    name: Build & deploy to ${{ inputs.target || 'prod' }}
     runs-on: ubuntu-latest
-    outputs:
-      image: ${{ steps.tag.outputs.image }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Determine image tag
-        id: tag
+      - name: Resolve target config
+        id: cfg
         run: |
           if [ "${{ github.event_name }}" = "release" ]; then
+            TARGET=prod
             TAG="${{ github.event.release.tag_name }}"
           else
-            TAG="${{ github.event.inputs.image_tag }}"
+            TARGET="${{ inputs.target }}"
+            TAG="${{ inputs.image_tag }}"
+            if [ -z "$TAG" ]; then
+              TAG="sha-$(echo $GITHUB_SHA | cut -c1-7)"
+            fi
           fi
-          echo "image=${{ env.AR_REPO }}/beepbox-server:${TAG}" >> "$GITHUB_OUTPUT"
+          PROJECT="beeping-platform-${TARGET}"
+          AR="europe-west1-docker.pkg.dev/${PROJECT}/beepbox"
+          echo "target=$TARGET"             >> "$GITHUB_OUTPUT"
+          echo "project=$PROJECT"           >> "$GITHUB_OUTPUT"
+          echo "ar=$AR"                     >> "$GITHUB_OUTPUT"
+          echo "image=$AR/beepbox-server:$TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Authenticate to GCP
+      - name: Authenticate to GCP (${{ steps.cfg.outputs.target }})
+        id: auth
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
-          service_account: ${{ secrets.WIF_SA }}
+          workload_identity_provider: ${{ steps.cfg.outputs.target == 'prod' && secrets.WIF_PROVIDER_PROD || secrets.WIF_PROVIDER_DEV }}
+          service_account: ${{ steps.cfg.outputs.target == 'prod' && secrets.WIF_SA_PROD || secrets.WIF_SA_DEV }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -58,22 +74,9 @@ jobs:
           context: .
           platforms: linux/amd64
           push: true
-          tags: ${{ steps.tag.outputs.image }}
+          tags: ${{ steps.cfg.outputs.image }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-  deploy:
-    name: Deploy to Cloud Run
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Authenticate to GCP
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
-          service_account: ${{ secrets.WIF_SA }}
 
       - name: Deploy to Cloud Run
         id: deploy
@@ -81,7 +84,8 @@ jobs:
         with:
           service: ${{ env.SERVICE }}
           region: ${{ env.REGION }}
-          image: ${{ needs.build-and-push.outputs.image }}
+          project_id: ${{ steps.cfg.outputs.project }}
+          image: ${{ steps.cfg.outputs.image }}
 
       - name: Smoke test
         id: smoke
@@ -90,17 +94,19 @@ jobs:
           sleep 10
           bash scripts/smoke.sh "${{ steps.deploy.outputs.url }}"
 
-      - name: Rollback on failure
+      - name: Rollback on smoke failure
         if: failure() && steps.smoke.outcome == 'failure'
         run: |
-          echo "Smoke tests failed — rolling back..."
+          echo "Smoke tests failed — rolling back ${{ steps.cfg.outputs.target }}..."
           PREV_REV=$(gcloud run revisions list \
             --service=${{ env.SERVICE }} \
+            --project=${{ steps.cfg.outputs.project }} \
             --region=${{ env.REGION }} \
             --format="value(name)" \
             --sort-by="~creationTimestamp" \
             --limit=2 | tail -1)
           gcloud run services update-traffic ${{ env.SERVICE }} \
+            --project=${{ steps.cfg.outputs.project }} \
             --region=${{ env.REGION }} \
             --to-revisions="${PREV_REV}=100"
-          echo "Rolled back to $PREV_REV"
+          echo "Rolled back to $PREV_REV in ${{ steps.cfg.outputs.target }}"

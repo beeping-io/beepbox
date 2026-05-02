@@ -4,8 +4,8 @@ Snapshot del estado real de los entornos GCP donde corre `beepbox-server`.
 **Vive en git porque es code-adjacent.** Este documento se actualiza a
 mano cuando cambia el bootstrap; no es source-of-truth automatizado.
 
-> Última actualización: 2026-05-02 — tras BEE-1800 (prod imagen al sha
-> de dev + CORS verificado).
+> Última actualización: 2026-05-02 — tras BEE-1803 (WIF cableado
+> para CI multi-env).
 
 ## Resumen ejecutivo
 
@@ -52,10 +52,9 @@ alinea).
   `value_source.secret_key_ref` con `version=latest`. Valores se
   rotan out-of-band con `gcloud secrets versions add` (Terraform
   ignora cambios al `secret_data` para no sobrescribir).
-- **Deploys CI**: `.github/workflows/deploy.yml` espera secrets
-  `WIF_PROVIDER` + `WIF_SA`. **Aún sin cablear** — BEE-1803 (T5) lo
-  resuelve. Mientras, deploys son manuales desde la máquina del
-  founder.
+- **Deploys CI**: `.github/workflows/deploy.yml` autenticado vía WIF
+  (BEE-1803), soporta `target=dev|prod`. Detalles en
+  [`docs/ops/ci-cd.md`](ci-cd.md).
 
 ## Terraform
 
@@ -107,7 +106,6 @@ gcloud run deploy beepbox-server \
 
 ## Pendientes registrados (`docs/PENDING.md`)
 
-- **pending-001** — WIF para `deploy.yml`. **Resuelto por BEE-1803**.
 - **pending-002** — `/healthz` desde fuera devuelve HTML 404 de Google
   Frontend (parece reservado por GFE). Cosmético — usamos `/readyz`.
   **Documentado por BEE-1804**.

@@ -19,6 +19,8 @@
   manual + rollback + troubleshooting.
 - [`ops/supply-chain.md`](ops/supply-chain.md) — firma de imágenes,
   SBOM, attestations.
+- [`ops/ci-cd.md`](ops/ci-cd.md) — Workload Identity Federation +
+  multi-env deploys (`gh workflow run deploy.yml -f target=...`).
 
 ## Observability — qué se ve en runtime
 
