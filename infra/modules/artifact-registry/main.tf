@@ -1,4 +1,3 @@
-# Docker image repository
 resource "google_artifact_registry_repository" "beepbox" {
   repository_id = "beepbox"
   location      = var.region
