@@ -1,5 +1,0 @@
-# Copy to terraform.tfvars and adjust
-project_id = "beeping-platform-dev"
-region     = "europe-west1"
-image_tag  = "latest"
-cors_allowed_origins = "http://localhost:3000,https://beeping-platform-dev.web.app,https://beeping-platform-dev.firebaseapp.com"

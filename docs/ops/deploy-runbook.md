@@ -87,13 +87,24 @@ curl https://beeping-platform-dev-api.web.app/version
 | Slow cold start | Check Cloud Run logs for startup time. Consider `min-instances=1` |
 | Secret not found | `gcloud secrets versions list beepbox-api-keys` — verify latest version exists |
 | Image not found | `gcloud artifacts docker images list europe-west1-docker.pkg.dev/beeping-platform-dev/beepbox` |
-| `/healthz` returns 404 | Known Cloud Run behavior — use `/readyz` for external health checks |
+| `/healthz` returns 404 from external callers | Cloud Run / Google Frontend reserves `/healthz` for internal Cloud Run startup/liveness probes and **does not route external traffic to the container at that path**. The internal probes on the same path still work. **External callers must use `/readyz`** (also implemented in beepbox-server). Do not paper over with a separate `/health`; `/readyz` already covers the use case. |
 
 ## URLs
 
+### Production (`beeping-platform-prod`)
+
 | What | URL |
 |------|-----|
-| Cloud Run (direct) | `https://beepbox-server-ai7n45q5lq-ew.a.run.app` |
+| Canonical | `https://beepbox.beeping.io` |
+| Firebase Hosting | `https://beeping-platform-prod-api.web.app` |
+| Cloud Run (direct) | `https://beepbox-server-jlqkyqxtca-ew.a.run.app` |
+| Cloud Console | `https://console.cloud.google.com/run/detail/europe-west1/beepbox-server?project=beeping-platform-prod` |
+
+### Development (`beeping-platform-dev`)
+
+| What | URL |
+|------|-----|
+| Canonical | `https://beepbox-dev.beeping.io` |
 | Firebase Hosting | `https://beeping-platform-dev-api.web.app` |
-| Custom domain (pending DNS) | `https://api.beeping.io` |
-| Cloud Console | `https://console.cloud.google.com/run/detail/europe-west1/beepbox-server` |
+| Cloud Run (direct) | `https://beepbox-server-ai7n45q5lq-ew.a.run.app` |
+| Cloud Console | `https://console.cloud.google.com/run/detail/europe-west1/beepbox-server?project=beeping-platform-dev` |

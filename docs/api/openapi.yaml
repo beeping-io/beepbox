@@ -18,10 +18,12 @@ info:
     email: dev@beeping.io
 
 servers:
+  - url: https://beepbox.beeping.io
+    description: Production
+  - url: https://beepbox-dev.beeping.io
+    description: Development
   - url: http://localhost:8080
-    description: Local development
-  - url: https://api.beeping.io
-    description: Production (Cloud Run)
+    description: Local (running ./build/beepbox-server)
 
 tags:
   - name: encoding

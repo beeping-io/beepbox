@@ -65,13 +65,17 @@ clients/
 .env.local
 .env.*.local
 
+# Claude Code local state (per-machine settings, scheduled-task locks)
+.claude/
+
 # Terraform
-infra/.terraform/
-infra/*.tfstate
-infra/*.tfstate.backup
-infra/*.tfplan
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.backup
+**/*.tfplan
+**/.terraform.lock.hcl
+# Old flat-layout secrets file (env config now lives in infra/envs/*/ and is committed)
 infra/terraform.tfvars
-infra/.terraform.lock.hcl
 
 # clangd index
 .cache/
