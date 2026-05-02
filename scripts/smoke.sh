@@ -44,27 +44,27 @@ check "/metrics" 200 -X GET "${BASE_URL}/metrics"
 
 # 4. Encode — valid request
 if [ -n "$API_KEY" ]; then
-  check "/v1/encode" 200 \
+  check "/v1/encode (with auth)" 200 \
     -X POST "${BASE_URL}/v1/encode" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $API_KEY" \
     -d '{"key":"a1b2c","mode":"inaudible","duration":2.3}'
 else
-  # Without API key, expect 401 if auth is enabled, 200 if disabled
-  check "/v1/encode (no auth)" 200 \
+  # Auth required (BEE-1687) — 401 is the correct response without a key
+  check "/v1/encode (no auth → 401)" 401 \
     -X POST "${BASE_URL}/v1/encode" \
     -H "Content-Type: application/json" \
     -d '{"key":"a1b2c","mode":"inaudible","duration":2.3}'
 fi
 
-# 5. Decode — empty body (expect 400 with auth, 401 without)
+# 5. Decode — empty body
 if [ -n "$API_KEY" ]; then
   check "/v1/decode (empty → 400)" 400 \
     -X POST "${BASE_URL}/v1/decode" \
     -H "Content-Type: audio/wav" \
     -H "Authorization: Bearer $API_KEY"
 else
-  check "/v1/decode (no auth)" 400 \
+  check "/v1/decode (no auth → 401)" 401 \
     -X POST "${BASE_URL}/v1/decode" \
     -H "Content-Type: audio/wav"
 fi
