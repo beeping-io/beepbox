@@ -57,4 +57,3 @@ Usa el skill `/pending` (recomendado). O copia este bloque al final del fichero:
 <!-- pending-002 (/healthz GFE intercept) cerrado por BEE-1804:
      documentado en docs/ops/deploy-runbook.md como
      comportamiento esperado de Cloud Run, no bug. -->
-
