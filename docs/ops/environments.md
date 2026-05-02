@@ -4,8 +4,8 @@ Snapshot del estado real de los entornos GCP donde corre `beepbox-server`.
 **Vive en git porque es code-adjacent.** Este documento se actualiza a
 mano cuando cambia el bootstrap; no es source-of-truth automatizado.
 
-> Última actualización: 2026-05-02 — tras BEE-1803 (WIF cableado
-> para CI multi-env).
+> Última actualización: 2026-05-02 — tras BEE-1804 (custom domains
+> registrados en Firebase Hosting; CNAMEs en GoDaddy pendiente).
 
 ## Resumen ejecutivo
 
@@ -23,7 +23,7 @@ alinea).
 | CORS | `localhost:3000` + dev Firebase hosts | `https://beeping.io` (sin localhost, sin subdominios) |
 | Artifact Registry | `beepbox/` repo en `europe-west1` | `beepbox/` repo en `europe-west1` |
 | Firebase Hosting | site `beeping-platform-dev-api` | site `beeping-platform-prod-api` |
-| Custom domain | pendiente DNS (T6: `api-dev.beeping.io`) | pendiente DNS (T6: `api.beeping.io`) |
+| Custom domain | `beepbox-dev.beeping.io` (Firebase registrado, esperando CNAME GoDaddy) | `beepbox.beeping.io` (Firebase registrado, esperando CNAME GoDaddy) |
 
 `/version` responde 200 en ambos.
 
@@ -104,11 +104,15 @@ gcloud run deploy beepbox-server \
   --project beeping-platform-{env}
 ```
 
-## Pendientes registrados (`docs/PENDING.md`)
+## Riesgos cerrados por BEE-1804
 
-- **pending-002** — `/healthz` desde fuera devuelve HTML 404 de Google
-  Frontend (parece reservado por GFE). Cosmético — usamos `/readyz`.
-  **Documentado por BEE-1804**.
+- ✅ Custom domains registrados en Firebase Hosting:
+  `beepbox.beeping.io` (prod), `beepbox-dev.beeping.io` (dev).
+  Faltan CNAMEs en GoDaddy para que SSL provisione.
+- ✅ `/healthz` 404 desde fuera (antes `pending-002`): documentado en
+  `docs/ops/deploy-runbook.md` como comportamiento esperado de Cloud
+  Run (GFE reserva `/healthz` para probes internos). Callers externos
+  usan `/readyz`.
 
 ## Riesgos cerrados por BEE-1799
 

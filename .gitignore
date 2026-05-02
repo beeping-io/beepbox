@@ -65,6 +65,9 @@ clients/
 .env.local
 .env.*.local
 
+# Claude Code local state (per-machine settings, scheduled-task locks)
+.claude/
+
 # Terraform
 **/.terraform/
 **/*.tfstate

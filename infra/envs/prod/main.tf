@@ -33,6 +33,7 @@ module "firebase_hosting" {
   project_id             = var.project_id
   region                 = var.region
   cloud_run_service_name = module.cloud_run.service_name
+  custom_domain          = var.custom_domain
 }
 
 # Existing prod resources created out-of-band (manual deploy 2026-04-23).

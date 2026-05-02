@@ -18,3 +18,9 @@ variable "cors_allowed_origins" {
   description = "CORS-allowed origins (CSV). Empty disables CORS."
   type        = string
 }
+
+variable "custom_domain" {
+  description = "Custom domain (FQDN) for the Firebase Hosting site"
+  type        = string
+  default     = ""
+}

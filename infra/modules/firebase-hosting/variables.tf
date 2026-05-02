@@ -12,3 +12,9 @@ variable "cloud_run_service_name" {
   description = "Cloud Run service name to rewrite all traffic to"
   type        = string
 }
+
+variable "custom_domain" {
+  description = "Optional custom domain (FQDN) to map to this Firebase Hosting site. Empty disables custom-domain registration."
+  type        = string
+  default     = ""
+}

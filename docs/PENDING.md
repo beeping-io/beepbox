@@ -54,25 +54,7 @@ Usa el skill `/pending` (recomendado). O copia este bloque al final del fichero:
 
 ## 🗂️ Pendientes registrados
 
-### ⏳ pending-002 — `/healthz` interceptado por Google Frontend
+<!-- pending-002 (/healthz GFE intercept) cerrado por BEE-1804:
+     documentado en docs/ops/deploy-runbook.md como
+     comportamiento esperado de Cloud Run, no bug. -->
 
-- 📅 **Fecha añadida**: 2026-04-29
-- 🏷️ **Tipo**: infra
-- 🧭 **Trigger**: durante la verificación post-deploy de BEE-1794
-  observamos que `GET /healthz` desde fuera devuelve un HTML 404
-  de Google Frontend (no llega a nuestro server), aunque el mismo
-  endpoint funciona para los probes internos del Cloud Run y
-  externamente `/readyz` y `/version` responden correctamente
-  desde nuestro app. Probable: Cloud Run / GFE intercepta
-  `/healthz` para health-check interno y nunca lo enruta al
-  contenedor desde tráfico externo, mientras que internamente
-  para probes sí funciona. Cosmético (`/readyz` cubre el mismo
-  uso para callers externos), pero confunde si alguien debugea el
-  servicio con curl.
-- ⚙️ **Acción requerida**: investigar si Cloud Run reserva
-  `/healthz`. Si sí, documentar en `docs/ops/deploy-runbook.md` que
-  los callers externos deben usar `/readyz`. Si no, abrir issue
-  con GCP support.
-- 🚧 **Bloqueado por**: nada — bug cosmético, no afecta
-  funcionalidad.
-- 🚦 **Estado**: 🆕 Nuevo
