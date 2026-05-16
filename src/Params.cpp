@@ -1,10 +1,13 @@
 #include "beepbox/Params.h"
-#include "beepbox/Scheduler.h"
 #include <BeepingCoreLib_api.h>
 #include <algorithm>
-#include <cmath>
 
 namespace beepbox {
+
+// Minimum beep window in seconds. Mirrors the constant in beeping-core's
+// scheduler (BEEPING_ComputeBeepSchedule rejects shorter windows). Not
+// exposed in the public C API, so kept inline here for validation.
+static constexpr float kMinBeepWindow = 2.3f;
 
 ValidationResult validate(const Params& p) {
   ValidationResult r;
