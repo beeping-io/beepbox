@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 
 project(BeepBox
-  VERSION 0.0.0 # x-release-please-version
+  VERSION 0.1.0 # x-release-please-version
   DESCRIPTION "C++20 tool for encoding data over sound — CLI + library"
   HOMEPAGE_URL "https://github.com/beeping-io/beepbox"
   LANGUAGES CXX
