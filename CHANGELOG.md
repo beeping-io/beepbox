@@ -6,7 +6,7 @@
 ### ✨ Features
 
 * **server:** BEE-1794 enable CORS for browser clients ([#6](https://github.com/beeping-io/beepbox/issues/6)) ([96cf4a8](https://github.com/beeping-io/beepbox/commit/96cf4a8746afd5063af5a78859cc40db76aad74c))
-* **server:** BEE-1800 deploy current image to prod with prod-only CORS whitelist (https://beeping.io) — squashed in [#8](https://github.com/beeping-io/beepbox/issues/8) ([ff749c5](https://github.com/beeping-io/beepbox/commit/ff749c5))
+* **server:** BEE-1800 deploy current image to prod with prod-only CORS whitelist (<https://beeping.io>) — squashed in [#8](https://github.com/beeping-io/beepbox/issues/8) ([ff749c5](https://github.com/beeping-io/beepbox/commit/ff749c5))
 * **server:** BEE-2239 use beeping-core scheduler API (drop duplicate Scheduler.cpp) + expose `code` and `timestampSec` in /v1/decode (additive, legacy `decoded` preserved). Encoder now emits exactly `floor(duration × sampleRate)` samples, beeps placed at timestamp-aligned positions — squashed in [#9](https://github.com/beeping-io/beepbox/issues/9) ([31c055c](https://github.com/beeping-io/beepbox/commit/31c055c))
 
 
@@ -38,14 +38,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 ### Added
-- Opción `--dry-run` para validar parámetros y mostrar el plan sin generar audio.
-- Defaults coherentes documentados (p. ej. duración por defecto 2.3s).
-- Ayuda del CLI ampliada con descripciones y ejemplos.
+* Opción `--dry-run` para validar parámetros y mostrar el plan sin generar audio.
+* Defaults coherentes documentados (p. ej. duración por defecto 2.3s).
+* Ayuda del CLI ampliada con descripciones y ejemplos.
 
 ### Changed
-- Validación conceptual de intervalos/duración y coherencia entre parámetros.
-- Validaciones del CLI más estrictas y con mensajes claros.
+* Validación conceptual de intervalos/duración y coherencia entre parámetros.
+* Validaciones del CLI más estrictas y con mensajes claros.
 
 ### Fixed
-- Combinaciones de parámetros inconsistentes o sin sentido ahora se detectan.
-- Defaults y comportamientos previamente implícitos ahora están documentados.
+* Combinaciones de parámetros inconsistentes o sin sentido ahora se detectan.
+* Defaults y comportamientos previamente implícitos ahora están documentados.
