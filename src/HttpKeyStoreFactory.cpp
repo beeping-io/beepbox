@@ -2,7 +2,9 @@
 // Pulls in cpp-httplib (HTTPS client) and jsoncpp (response parsing).
 // Kept out of the core library so tests don't need OpenSSL/jsoncpp.
 
+#ifndef CPPHTTPLIB_OPENSSL_SUPPORT
 #define CPPHTTPLIB_OPENSSL_SUPPORT
+#endif
 #include <httplib.h>
 #include <json/json.h>
 

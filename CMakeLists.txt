@@ -37,7 +37,7 @@ else()
   FetchContent_Declare(
     BeepingCore
     GIT_REPOSITORY https://github.com/beeping-io/beeping-core.git
-    GIT_TAG        v0.0.0
+    GIT_TAG        v0.8.1
     GIT_SHALLOW    TRUE
   )
   FetchContent_MakeAvailable(BeepingCore)
@@ -64,7 +64,6 @@ pkg_check_modules(SNDFILE REQUIRED sndfile)
 add_library(beepbox_lib STATIC
   src/Base32.cpp
   src/Params.cpp
-  src/Scheduler.cpp
   src/Generator.cpp
   src/Mixer.cpp
   src/VRand.cpp
@@ -217,8 +216,8 @@ if(BUILD_TESTING)
   add_executable(BeepBoxTests
     tests/Base32Tests.cpp
     tests/ParamsTests.cpp
-    tests/SchedulerTests.cpp
     tests/GeneratorTests.cpp
+    tests/EncodeGoldenTests.cpp
     tests/RoundTripTests.cpp
     tests/ConcurrencyTests.cpp
     tests/ApiKeyAuthTests.cpp
@@ -237,6 +236,9 @@ if(BUILD_TESTING)
   target_link_libraries(BeepBoxTests PRIVATE beepbox_lib Catch2::Catch2WithMain)
   target_include_directories(BeepBoxTests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+  )
+  target_compile_definitions(BeepBoxTests PRIVATE
+    BEEPBOX_GOLDEN_HASH_PATH="${CMAKE_CURRENT_SOURCE_DIR}/tests/data/encode_golden_hash.txt"
   )
 
   # --- Server endpoint integration tests (require beepbox-server running) ---
