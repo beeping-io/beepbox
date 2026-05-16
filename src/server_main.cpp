@@ -408,6 +408,18 @@ int main() {
           int rc = BEEPING_GetDecodedData(buf, core);
           if (rc > 0) {
             json["decoded"] = std::string(buf, rc);
+            // Split the scheduler-formatted payload into code prefix +
+            // rounded-seconds timestamp. Works on the same 9-char wire
+            // format emitted by BEEPING_EncodeWithSchedule.
+            char codeBuf[64] = {};
+            int32_t codeSize = 0;
+            int32_t tsSec = 0;
+            int32_t splitRc = BEEPING_ParseScheduledPayload(
+                buf, rc, codeBuf, sizeof(codeBuf), &codeSize, &tsSec);
+            if (splitRc == 0) {
+              json["code"] = std::string(codeBuf, codeSize);
+              json["timestampSec"] = tsSec;
+            }
             json["confidence"] = BEEPING_GetConfidence(core);
             json["mode"] = BEEPING_GetDecodedMode(core);
             resp->setStatusCode(k200OK);

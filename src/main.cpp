@@ -1,6 +1,4 @@
 #include "beepbox/Params.h"
-#include "beepbox/Base32.h"
-#include "beepbox/Scheduler.h"
 #include "beepbox/Generator.h"
 #include "beepbox/LoudnessStats.h"
 #include "Mixer.h"
@@ -9,10 +7,8 @@
 #include <BeepingCoreLib_api.h>
 #include <sndfile.h>
 
+#include <cstdint>
 #include <iostream>
-#include <cstring>
-#include <ctime>
-#include <cmath>
 #include <algorithm>
 #include <vector>
 #include <string>
@@ -150,8 +146,10 @@ int main(int argc, char** argv) {
 
   // --- No input file: generate beeps only ---
   if (inputFile.empty()) {
-    int beepCount = computeBeepCount(p.duration, p.startTime, p.interval);
-    auto schedule = computeBeepSchedule(p.duration, p.startTime, p.interval);
+    int32_t beepCount = 0;
+    BEEPING_ComputeBeepSchedule(p.duration, p.startTime, p.interval,
+                                /*outTimestamps=*/nullptr, /*maxTimestamps=*/0,
+                                &beepCount);
 
     if (beepCount <= 0) {
       std::cerr << "Error: duration too short for any beeps\n";
@@ -219,7 +217,10 @@ int main(int argc, char** argv) {
     sf_close(in);
 
     float hostDuration = static_cast<float>(nFrames) / fileSampleRate;
-    int beepCount = computeBeepCount(hostDuration, p.startTime, p.interval);
+    int32_t beepCount = 0;
+    BEEPING_ComputeBeepSchedule(hostDuration, p.startTime, p.interval,
+                                /*outTimestamps=*/nullptr, /*maxTimestamps=*/0,
+                                &beepCount);
 
     if (beepCount <= 0) {
       std::cerr << "Error: input file too short for any beeps\n";

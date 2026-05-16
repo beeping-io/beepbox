@@ -1,106 +1,81 @@
 #include "beepbox/Generator.h"
-#include "beepbox/Base32.h"
-#include "beepbox/Scheduler.h"
+
 #include <BeepingCoreLib_api.h>
-#include <cstring>
-#include <cmath>
-#include <algorithm>
+
+#include <cstdint>
 
 namespace beepbox {
 
-static constexpr int kBufferSize = 128;
-// Duration of a single token in seconds (from BeepingConfig default).
-static constexpr double kDurToken = 0.104489796;
+namespace {
 
-static void encodeBeepsIntoBuffer(
-    void* core, const Params& p,
-    std::vector<float>& outSamples,
-    float effectiveSampleRate, float effectiveDuration,
-    int beepsToGenerate, const std::vector<double>& schedule) {
+// Internal exchange buffer size for BEEPING_Configure. Not exposed to
+// callers — beeping-core handles internal segmentation. Matches the value
+// used in the pre-refactor implementation for parity.
+constexpr int kConfigBufferSize = 128;
 
-  double durToken = kDurToken;
-  double currentTime = 0.0;
-  double nextMarkTime = p.startTime;
-  int beepsGenerated = 0;
-  float defBeepLevel = std::pow(10.0f, std::clamp(p.volumeBeepsdB, -60.0f, 12.0f) / 20.0f);
+GenerateResult encodeViaCoreSchedule(const Params& p,
+                                     float effectiveSampleRate,
+                                     float effectiveDuration) {
+  GenerateResult result;
+  result.sampleRate = effectiveSampleRate;
 
-  float silenceBuf[kBufferSize] = {};
-  float audioBuf[kBufferSize] = {};
+  void* core = BEEPING_Create();
+  if (!core) return result;
 
-  while (currentTime < effectiveDuration) {
-    if (beepsGenerated < beepsToGenerate &&
-        currentTime >= (nextMarkTime - durToken * 20.0)) {
-      int timestampSec = static_cast<int>(nextMarkTime + 0.5f);
-      std::string ts = toBase32(timestampSec);
-      while (ts.size() < 4) ts = "0" + ts;
+  BEEPING_Configure(toCoreMode(p.mode), effectiveSampleRate,
+                    kConfigBufferSize, core);
 
-      std::string payload = p.key + ts;
-      int sizeAudioBuffer = BEEPING_EncodeDataToAudioBuffer(
-          payload.c_str(), static_cast<int>(payload.size()), 0, 0, 0, core);
-      (void)sizeAudioBuffer;
-
-      int samplesRetrieved = 0;
-      do {
-        std::memset(audioBuf, 0, kBufferSize * sizeof(float));
-        samplesRetrieved = BEEPING_GetEncodedAudioBuffer(audioBuf, core);
-        for (int i = 0; i < samplesRetrieved; ++i) {
-          outSamples.push_back(defBeepLevel * audioBuf[i]);
-        }
-        currentTime += static_cast<double>(samplesRetrieved) / effectiveSampleRate;
-      } while (samplesRetrieved > 0);
-
-      BEEPING_ResetEncodedAudioBuffer(core);
-      beepsGenerated++;
-      nextMarkTime += p.interval;
-    } else {
-      for (int i = 0; i < kBufferSize; ++i) {
-        outSamples.push_back(0.0f);
-      }
-      currentTime += static_cast<double>(kBufferSize) / effectiveSampleRate;
-    }
+  int32_t required =
+      BEEPING_GetScheduleBufferSize(effectiveDuration, core);
+  if (required <= 0) {
+    BEEPING_Destroy(core);
+    return result;
   }
+  result.samples.assign(static_cast<std::size_t>(required), 0.0f);
+
+  int32_t samplesWritten = 0;
+  int32_t rc = BEEPING_EncodeWithSchedule(
+      p.key.c_str(), static_cast<int32_t>(p.key.size()),
+      /*type=*/0, /*melody=*/nullptr, /*melodySize=*/0,
+      effectiveDuration, p.startTime, p.interval,
+      p.volumeBeepsdB,
+      result.samples.data(), static_cast<int32_t>(result.samples.size()),
+      &samplesWritten, core);
+
+  if (rc != 0) {
+    result.samples.clear();
+    result.beepsGenerated = 0;
+    BEEPING_Destroy(core);
+    return result;
+  }
+  if (samplesWritten >= 0 &&
+      static_cast<std::size_t>(samplesWritten) < result.samples.size()) {
+    result.samples.resize(static_cast<std::size_t>(samplesWritten));
+  }
+
+  int32_t beepCount = 0;
+  BEEPING_ComputeBeepSchedule(effectiveDuration, p.startTime, p.interval,
+                              nullptr, 0, &beepCount);
+  result.beepsGenerated = beepCount;
+
+  BEEPING_Destroy(core);
+  return result;
 }
+
+}  // namespace
 
 GenerateResult generateBeeps(const Params& p) {
-  GenerateResult result;
-  result.sampleRate = p.sampleRate;
-
-  int beepCount = computeBeepCount(p.duration, p.startTime, p.interval);
-  if (beepCount <= 0) return result;
-
-  auto schedule = computeBeepSchedule(p.duration, p.startTime, p.interval);
-
-  void* core = BEEPING_Create();
-  BEEPING_Configure(toCoreMode(p.mode), p.sampleRate, kBufferSize, core);
-
-  encodeBeepsIntoBuffer(core, p, result.samples, p.sampleRate, p.duration, beepCount, schedule);
-  result.beepsGenerated = beepCount;
-
-  BEEPING_Destroy(core);
-  return result;
+  return encodeViaCoreSchedule(p, p.sampleRate, p.duration);
 }
 
-GenerateResult generateBeepsForHost(const Params& p, int hostSamples, float hostSampleRate) {
-  GenerateResult result;
-  result.sampleRate = hostSampleRate;
-
+GenerateResult generateBeepsForHost(const Params& p, int hostSamples,
+                                    float hostSampleRate) {
   float hostDuration = static_cast<float>(hostSamples) / hostSampleRate;
-  int beepCount = computeBeepCount(hostDuration, p.startTime, p.interval);
-  if (beepCount <= 0) return result;
-
-  auto schedule = computeBeepSchedule(hostDuration, p.startTime, p.interval);
-
-  void* core = BEEPING_Create();
-  BEEPING_Configure(toCoreMode(p.mode), hostSampleRate, kBufferSize, core);
-
-  encodeBeepsIntoBuffer(core, p, result.samples, hostSampleRate, hostDuration, beepCount, schedule);
-  result.beepsGenerated = beepCount;
-
-  // Pad or trim to match host length
-  result.samples.resize(hostSamples, 0.0f);
-
-  BEEPING_Destroy(core);
+  auto result = encodeViaCoreSchedule(p, hostSampleRate, hostDuration);
+  if (!result.samples.empty()) {
+    result.samples.resize(static_cast<std::size_t>(hostSamples), 0.0f);
+  }
   return result;
 }
 
-} // namespace beepbox
+}  // namespace beepbox

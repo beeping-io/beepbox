@@ -64,7 +64,6 @@ pkg_check_modules(SNDFILE REQUIRED sndfile)
 add_library(beepbox_lib STATIC
   src/Base32.cpp
   src/Params.cpp
-  src/Scheduler.cpp
   src/Generator.cpp
   src/Mixer.cpp
   src/VRand.cpp
@@ -217,7 +216,6 @@ if(BUILD_TESTING)
   add_executable(BeepBoxTests
     tests/Base32Tests.cpp
     tests/ParamsTests.cpp
-    tests/SchedulerTests.cpp
     tests/GeneratorTests.cpp
     tests/EncodeGoldenTests.cpp
     tests/RoundTripTests.cpp

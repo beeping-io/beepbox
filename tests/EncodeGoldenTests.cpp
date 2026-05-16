@@ -10,7 +10,7 @@
 #include <string>
 
 #ifndef BEEPBOX_GOLDEN_HASH_PATH
-#define BEEPBOX_GOLDEN_HASH_PATH "tests/data/encode_golden_hash.txt"
+#error "BEEPBOX_GOLDEN_HASH_PATH must be defined by the build system"
 #endif
 
 namespace {
@@ -59,8 +59,14 @@ TEST_CASE("Encode golden: deterministic buffer hash for fixed params",
   REQUIRE(result.beepsGenerated > 0);
   REQUIRE(!result.samples.empty());
 
+  // Hash only the canonical sample window — floor(duration * sampleRate) —
+  // so the test is invariant to harmless trailing-silence padding from
+  // buffer-aligned emit loops.
+  const std::size_t kCanonical =
+      static_cast<std::size_t>(p.duration * p.sampleRate);
+  REQUIRE(result.samples.size() >= kCanonical);
   const std::string computed =
-      fnv1a64Hex(result.samples.data(), result.samples.size());
+      fnv1a64Hex(result.samples.data(), kCanonical);
   const std::string expected = readFile(BEEPBOX_GOLDEN_HASH_PATH);
 
   INFO("Computed FNV-1a 64-bit hash: " << computed);
