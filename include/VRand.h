@@ -175,4 +175,4 @@ public:
   }
 };
 
-#endif __VRand_H_
+#endif  // __VRand_H_
