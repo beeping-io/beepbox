@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.1](https://github.com/beeping-io/beepbox/compare/v0.1.0...v0.1.1) (2026-06-02)
+
+
+### 📚 Documentation
+
+* **pending:** capture v0.1.0 deploy follow-ups (auth keys, GHCR build, release-trigger) ([#11](https://github.com/beeping-io/beepbox/issues/11)) ([6bef33d](https://github.com/beeping-io/beepbox/commit/6bef33d1e50d4673891ad180796e5d3047141677))
+* **readme:** link the 3 community channels (GitHub Discussions, Slack, Discord) ([#17](https://github.com/beeping-io/beepbox/issues/17)) ([aafa4eb](https://github.com/beeping-io/beepbox/commit/aafa4eb55793f9c751aacbdb881ecb8a97cce964))
+
 ## [0.1.0](https://github.com/beeping-io/beepbox/compare/v0.0.0...v0.1.0) (2026-05-16)
 
 
