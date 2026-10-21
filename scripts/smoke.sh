@@ -33,10 +33,10 @@ echo "=== Smoke tests: $BASE_URL ==="
 [ -n "$API_KEY" ] && echo "  (using API key)" || echo "  (no API key — /v1/* may return 401)"
 echo ""
 
-# 1. Liveness probe (/health works on both direct Cloud Run and Firebase Hosting;
-#    /healthz works on Firebase Hosting via 307 -> /health and on localhost)
+# 1. Liveness probe (/health works on all endpoints; /healthz is intercepted by
+#    Google Frontend on Cloud Run / Firebase Hosting and only reachable locally)
 check "/health" 200 -L -X GET "${BASE_URL}/health"
-if [[ "${BASE_URL}" != *".a.run.app"* ]]; then
+if [[ "${BASE_URL}" == *"localhost"* || "${BASE_URL}" == *"127.0.0.1"* ]]; then
   check "/healthz" 200 -L -X GET "${BASE_URL}/healthz"
 fi
 
