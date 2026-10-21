@@ -21,11 +21,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /src
 COPY . .
 
+ARG BEEPBOX_GIT_SHA=unknown
+
 RUN cmake -B build \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_EXE_LINKER_FLAGS="-static-libgcc -static-libstdc++" \
       -DBUILD_TESTING=OFF \
       -DBEEPBOX_BUILD_SERVER=ON \
+      -DBEEPBOX_GIT_SHA="${BEEPBOX_GIT_SHA}" \
   && cmake --build build --target beepbox-server -j"$(nproc)"
 
 # Collect runtime shared library dependencies

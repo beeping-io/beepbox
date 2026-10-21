@@ -39,6 +39,26 @@ paths:
       operationId: getHealth
       summary: Liveness probe
       security: []
+      description: |
+        Returns 200 if the server process is alive. On `beepbox.beeping.io`
+        (Firebase Hosting), `/healthz` redirects (307) to `/health` so external
+        clients bypass Cloud Run GFE's reserved `/healthz` interception.
+      tags: [operations]
+      responses:
+        "200":
+          description: Server is alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: ok
+
+  /health:
+    get:
+      operationId: getHealthAlias
+      summary: External liveness probe (GFE-safe alias of /healthz)
+      security: []
       description: Returns 200 if the server process is alive.
       tags: [operations]
       responses:
