@@ -37,7 +37,7 @@ else()
   FetchContent_Declare(
     BeepingCore
     GIT_REPOSITORY https://github.com/beeping-io/beeping-core.git
-    GIT_TAG        v0.8.1
+    GIT_TAG        v0.8.2
     GIT_SHALLOW    TRUE
   )
   FetchContent_MakeAvailable(BeepingCore)
@@ -45,6 +45,8 @@ endif()
 
 # --- libebur128 (FetchContent always — not on ConanCenter) ---
 
+set(_BEEPBOX_SAVED_POLICY_MIN "${CMAKE_POLICY_VERSION_MINIMUM}")
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 FetchContent_Declare(
   libebur128
   GIT_REPOSITORY https://github.com/jiixyj/libebur128.git
@@ -52,6 +54,8 @@ FetchContent_Declare(
   GIT_SHALLOW    TRUE
 )
 FetchContent_MakeAvailable(libebur128)
+set(CMAKE_POLICY_VERSION_MINIMUM "${_BEEPBOX_SAVED_POLICY_MIN}")
+unset(_BEEPBOX_SAVED_POLICY_MIN)
 
 # --- System dependency: libsndfile ---
 
@@ -108,13 +112,15 @@ option(BEEPBOX_BUILD_SERVER "Build the beepbox-server HTTP executable" ON)
 
 if(BEEPBOX_BUILD_SERVER)
   # --- Build metadata (git SHA + timestamp) ---
-  execute_process(
-    COMMAND git rev-parse --short HEAD
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    OUTPUT_VARIABLE BEEPBOX_GIT_SHA
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    ERROR_QUIET
-  )
+  if(NOT DEFINED BEEPBOX_GIT_SHA OR BEEPBOX_GIT_SHA STREQUAL "" OR BEEPBOX_GIT_SHA STREQUAL "unknown")
+    execute_process(
+      COMMAND git rev-parse --short HEAD
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+      OUTPUT_VARIABLE BEEPBOX_GIT_SHA
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      ERROR_QUIET
+    )
+  endif()
   if(NOT BEEPBOX_GIT_SHA)
     set(BEEPBOX_GIT_SHA "unknown")
   endif()
@@ -134,6 +140,12 @@ if(BEEPBOX_BUILD_SERVER)
     GIT_SHALLOW    TRUE
   )
   FetchContent_MakeAvailable(drogon)
+  if(TARGET trantor)
+    target_compile_options(trantor PRIVATE -Wno-unused-result)
+  endif()
+  if(TARGET drogon)
+    target_compile_options(drogon PRIVATE -Wno-unused-result)
+  endif()
 
   # cpp-httplib for outgoing HTTPS (HttpKeyStore validator). Header-only,
   # uses OpenSSL which Drogon already pulls in.

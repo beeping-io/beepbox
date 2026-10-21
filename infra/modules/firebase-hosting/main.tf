@@ -9,6 +9,12 @@ resource "google_firebase_hosting_version" "api" {
   site_id  = google_firebase_hosting_site.api.site_id
 
   config {
+    redirects {
+      glob        = "/healthz"
+      location    = "/health"
+      status_code = 307
+    }
+
     rewrites {
       glob = "**"
       run {

@@ -51,6 +51,7 @@ jobs:
           echo "project=$PROJECT"           >> "$GITHUB_OUTPUT"
           echo "ar=$AR"                     >> "$GITHUB_OUTPUT"
           echo "image=$AR/beepbox-server:$TAG" >> "$GITHUB_OUTPUT"
+          echo "git_sha=$(echo $GITHUB_SHA | cut -c1-7)" >> "$GITHUB_OUTPUT"
 
       - name: Authenticate to GCP (${{ steps.cfg.outputs.target }})
         id: auth
@@ -75,6 +76,8 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ steps.cfg.outputs.image }}
+          build-args: |
+            BEEPBOX_GIT_SHA=${{ steps.cfg.outputs.git_sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
