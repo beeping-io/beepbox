@@ -90,26 +90,6 @@ jobs:
           project_id: ${{ steps.cfg.outputs.project }}
           image: ${{ steps.cfg.outputs.image }}
 
-      - name: Update Firebase Hosting config (/healthz redirect + Cloud Run rewrite)
-        run: |
-          TOKEN=$(gcloud auth print-access-token)
-          SITE="${{ steps.cfg.outputs.project }}-api"
-          VER_JSON=$(curl -fsSL -X POST \
-            -H "Authorization: Bearer ${TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d '{"config":{"redirects":[{"glob":"/healthz","location":"/health","statusCode":307}],"rewrites":[{"glob":"**","run":{"serviceId":"beepbox-server","region":"europe-west1"}}]}}' \
-            "https://firebasehosting.googleapis.com/v1beta1/sites/${SITE}/versions")
-          VER_NAME=$(echo "$VER_JSON" | jq -r '.name')
-          curl -fsSL -X PATCH \
-            -H "Authorization: Bearer ${TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d '{"status":"FINALIZED"}' \
-            "https://firebasehosting.googleapis.com/v1beta1/${VER_NAME}?updateMask=status" > /dev/null
-          curl -fsSL -X POST \
-            -H "Authorization: Bearer ${TOKEN}" \
-            "https://firebasehosting.googleapis.com/v1beta1/sites/${SITE}/releases?versionName=${VER_NAME}" > /dev/null
-          echo "Published Firebase Hosting release for ${SITE} (${VER_NAME})"
-
       - name: Smoke test
         id: smoke
         run: |
