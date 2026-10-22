@@ -243,25 +243,32 @@ TEST_CASE("Encode then Decode round-trip via HTTP", "[server][roundtrip]") {
     return;
   }
 
-  // Encode — save WAV to file
-  std::string encCmd =
-      "curl -s -o /tmp/beepbox_rt.wav "
-      "-w '%{http_code}' "
-      "-X POST -H 'Content-Type: application/json' "
-      "-d '{\"key\": \"a1b2c\", \"mode\": \"audible\", \"duration\": 2.3}' " +
-      std::string(kBaseUrl) + "/v1/encode 2>/dev/null";
-  std::array<char, 16> buf{};
-  std::string statusStr;
-  std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(encCmd.c_str(), "r"),
-                                                pclose);
-  while (fgets(buf.data(), buf.size(), pipe.get()))
-    statusStr += buf.data();
-  REQUIRE(std::stoi(statusStr) == 200);
+  for (const char *mode : {"audible", "inaudible"}) {
+    // Encode — save WAV to file
+    std::string encCmd =
+        std::string("curl -s -o /tmp/beepbox_rt.wav "
+                    "-w '%{http_code}' "
+                    "-X POST -H 'Content-Type: application/json' "
+                    "-d '{\"key\": \"a1b2c\", \"mode\": \"") +
+        mode + "\", \"duration\": 2.3}' " + std::string(kBaseUrl) +
+        "/v1/encode 2>/dev/null";
+    std::array<char, 16> buf{};
+    std::string statusStr;
+    std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(encCmd.c_str(), "r"),
+                                                  pclose);
+    while (fgets(buf.data(), buf.size(), pipe.get()))
+      statusStr += buf.data();
+    REQUIRE(std::stoi(statusStr) == 200);
 
-  // Decode the WAV
-  auto r = curlPostBinary("/v1/decode", "/tmp/beepbox_rt.wav");
-  REQUIRE(r.httpStatus == 200);
-  REQUIRE(r.body.find("\"decoded\"") != std::string::npos);
-  // beeping-core returns payload with zero-padding (e.g. "a1b2c0000")
-  REQUIRE(r.body.find("a1b2c") != std::string::npos);
+    // Decode the WAV
+    auto r = curlPostBinary("/v1/decode", "/tmp/beepbox_rt.wav");
+    REQUIRE(r.httpStatus == 200);
+    REQUIRE(r.body.find("\"decoded\"") != std::string::npos);
+    REQUIRE(r.body.find("\"code\":\"a1b2c\"") != std::string::npos);
+    REQUIRE(r.body.find("\"timestampSec\":0") != std::string::npos);
+    REQUIRE(r.body.find("\"confidence\"") != std::string::npos);
+    REQUIRE(r.body.find("\"mode\"") != std::string::npos);
+    // beeping-core returns 9-char wire payload ("a1b2c0000")
+    REQUIRE(r.body.find("a1b2c0000") != std::string::npos);
+  }
 }

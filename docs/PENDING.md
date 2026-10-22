@@ -57,18 +57,9 @@ Usa el skill `/pending` (recomendado). O copia este bloque al final del fichero:
 <!-- pending-002 (/healthz GFE intercept) cerrado por BEE-1804:
      documentado en docs/ops/deploy-runbook.md como
      comportamiento esperado de Cloud Run, no bug. -->
-
-### ⏳ pending-003 — BEE-1802 test API keys no validan en dev ni prod
-
-* 📅 **Fecha añadida**: 2026-05-16
-* 🏷️ **Tipo**: fix
-* 🧭 **Trigger**: smoke E2E de v0.1.0 deploy en dev + prod. Tanto `BEEPBOX_TEST_KEY_DEV=bk_PkvVhXmkqJncUaoCf-kPvQ` como `BEEPBOX_TEST_KEY_PROD=[REDACTED-BEEPBOX-API-KEY]` (minteadas en BEE-1802 para SDK E2E suites) devuelven `HTTP 403 {"error":"Invalid API key"}` contra `/v1/encode` y `/v1/decode` en sus respectivos environments. El binary procesa el request y rechaza vía `requireAuth` → el problema es validator-side, no servidor.
-* ⚙️ **Acción requerida**: investigar por qué el HttpKeyStore (Cloud Function `validateApiKey`) rechaza estos hashes:
-  1. Comprobar Firestore collection `apiKeys` (o donde guarde los hashes) en `beeping-platform-dev` y `beeping-platform-prod` — ver si los docs existen, si tienen estado `revoked`, o si el hash almacenado coincide con el SHA256 del key claro
-  2. Hit directo al Cloud Function `validateApiKey` con el key y leer el response — confirma si el rechazo viene de la function o del cache local
-  3. Si están perdidos: re-mintear vía `generateApiKey` (BEE-1801 requiere Firebase Auth ahora) y actualizar `.env.local` + GCP Secret Manager sync
-* 🚧 **Bloqueado por**: nada (independiente del refactor BEE-2239)
-* 🚦 **Estado**: 🆕 Nuevo
+<!-- pending-003 (test API keys en dev/prod) cerrado por BEEP-93 (#93):
+     hashes SHA-256 sincronizados en validateApiKey / Firestore para
+     BEEPBOX_TEST_KEY_DEV y BEEPBOX_TEST_KEY_PROD. -->
 
 ### ⏳ pending-004 — Docker Build & Push (GHCR) workflow roto + commit:unknown en binarios
 
