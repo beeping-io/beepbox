@@ -265,7 +265,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/DecodeResponse"
               example:
-                decoded: "a1b2c"
+                decoded: "a1b2c0000"
+                code: "a1b2c"
+                timestampSec: 0
                 confidence: 0.95
                 mode: 2
         "400":
@@ -283,6 +285,23 @@ paths:
                   summary: Malformed WAV file
                   value:
                     error: "Invalid WAV: not a valid RIFF/WAVE file"
+        "401":
+          description: Missing or malformed API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Missing API key"
+                hint: "Add header: Authorization: Bearer bk_..."
+        "403":
+          description: Invalid or revoked API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Invalid API key"
         "404":
           description: No beeping data found in the audio
           content:
@@ -300,6 +319,20 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
               example:
                 error: "Decode returned invalid data"
+        "429":
+          description: Rate limit exceeded
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Rate limit exceeded"
+                hint: "Retry after 20 seconds"
 
 security:
   - ApiKeyAuth: []
@@ -371,8 +404,26 @@ components:
       properties:
         decoded:
           type: string
-          description: The decoded base32 payload
+          description: |
+            Raw 9-character wire payload (`code[5] + timestamp[4]`) recovered
+            by the decoder.
+          examples: ["a1b2c0000"]
+        code:
+          type: string
+          description: |
+            Parsed 5-character base32 public key prefix split from the
+            9-character wire payload (`BEEPING_ParseScheduledPayload`).
+          minLength: 5
+          maxLength: 5
+          pattern: "^[0-9a-v]{5}$"
           examples: ["a1b2c"]
+        timestampSec:
+          type: integer
+          description: |
+            Rounded timestamp offset in seconds parsed from the 4-character
+            base32 suffix of the wire payload.
+          minimum: 0
+          examples: [0]
         confidence:
           type: number
           format: float
