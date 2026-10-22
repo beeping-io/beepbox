@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.2.0](https://github.com/beeping-io/beepbox/compare/v0.1.0...v0.2.0) (2026-10-22)
+
+
+### ✨ Features
+
+* **api:** BEEP-93 document /v1/decode response fields and expand round-trip tests ([d3d786c](https://github.com/beeping-io/beepbox/commit/d3d786ccbe0d0bf2331e2e41712aa4006bf4e3fc))
+* **api:** BEEP-93 document /v1/decode response fields and expand round-trip tests ([63c9f0b](https://github.com/beeping-io/beepbox/commit/63c9f0b268a429564cc46bb0f7879a89de1ce63a))
+* **server:** BEEP-92 upgrade to beeping-core v0.8.2 and expose /health edge route ([9a7d87b](https://github.com/beeping-io/beepbox/commit/9a7d87b13d2d2e38efe7dfa9ec09c6f7e2069ad2))
+* **server:** BEEP-92 upgrade to beeping-core v0.8.2 and expose /health edge route ([18e63f2](https://github.com/beeping-io/beepbox/commit/18e63f2ce13e21f0ad5dd6b1aa6cfb81f69c5f53))
+* **toolchain:** BEE-2440 configure lefthook git hooks ([e53c1c5](https://github.com/beeping-io/beepbox/commit/e53c1c5e82952e75121f46493eae56b4ff5e1c87))
+
+
+### 🐛 Bug Fixes
+
+* **smoke:** BEEP-92 align external health check with GFE /healthz edge reservation ([b6bd2f4](https://github.com/beeping-io/beepbox/commit/b6bd2f4fbccca2c42b51c3cfef59942c6d6fa172))
+* **smoke:** BEEP-92 align external health check with GFE /healthz edge reservation ([661ae65](https://github.com/beeping-io/beepbox/commit/661ae65004737c408ab6f4b429264dd851bd87d9))
+
+
+### 📚 Documentation
+
+* **agy:** standardize GEMINI.md markdown formatting ([c1b166c](https://github.com/beeping-io/beepbox/commit/c1b166cb098d094606437b9898b48d9ddad8e511))
+* BEE-2404 add native GEMINI.md for beepbox ([1acc472](https://github.com/beeping-io/beepbox/commit/1acc472ec6e5e2e10b9e77d04b53ccb6d051baf7))
+* **beepbox:** sanitize legacy Linear references in docs ([dfe1596](https://github.com/beeping-io/beepbox/commit/dfe1596035a60283195770b2670abeab54f50b1a))
+* **pending:** capture v0.1.0 deploy follow-ups (auth keys, GHCR build, release-trigger) ([#11](https://github.com/beeping-io/beepbox/issues/11)) ([6bef33d](https://github.com/beeping-io/beepbox/commit/6bef33d1e50d4673891ad180796e5d3047141677))
+* **readme:** link the 3 community channels (GitHub Discussions, Slack, Discord) ([#17](https://github.com/beeping-io/beepbox/issues/17)) ([aafa4eb](https://github.com/beeping-io/beepbox/commit/aafa4eb55793f9c751aacbdb881ecb8a97cce964))
+
 ## [0.1.0](https://github.com/beeping-io/beepbox/compare/v0.0.0...v0.1.0) (2026-05-16)
 
 
